@@ -37,6 +37,8 @@ services:
       - COOKIES_FILE_PATH=/data/.douyin_cookies.json
       - TEMP_DIR=/tmp/omnivault
       - ACTIVATION_ENABLED=${ACTIVATION_ENABLED:-true}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
       - TZ=Etc/UTC
       - PORT=8080
       - HOST=0.0.0.0

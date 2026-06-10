@@ -69,6 +69,15 @@ def activate(key: str) -> bool:
         ACTIVATION_FILE.parent.mkdir(parents=True, exist_ok=True)
         ACTIVATION_FILE.write_text(key.strip())
         logger.info("激活成功")
+
+        # 通知作者（非阻塞，失败不影响激活）
+        try:
+            from .notify import notify_activation
+            import asyncio
+            asyncio.create_task(notify_activation())
+        except Exception:
+            pass
+
         return True
     except Exception as e:
         logger.error(f"写入激活文件失败: {e}")
