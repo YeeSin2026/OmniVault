@@ -36,6 +36,7 @@ services:
       - JOBS_DB_PATH=/data/jobs.db
       - COOKIES_FILE_PATH=/data/.douyin_cookies.json
       - TEMP_DIR=/tmp/omnivault
+      - ACTIVATION_ENABLED=${ACTIVATION_ENABLED:-true}
       - TZ=Etc/UTC
       - PORT=8080
       - HOST=0.0.0.0

@@ -54,7 +54,10 @@ cp .env.example .env        # 编辑 .env，填入 LLM_API_KEY
 docker compose up -d
 ```
 
-打开 http://localhost:8080，粘贴链接即可使用。
+首次打开需输入激活码，关注以下账号获取：
+
+[![Twitter](https://img.shields.io/badge/-Twitter-1DA1F2?logo=x&logoColor=white)](https://x.com/YeeSin2026)
+[![GitHub](https://img.shields.io/badge/-GitHub-181717?logo=github&logoColor=white)](https://github.com/YeeSin2026)
 
 > 💡 首次启动会下载 Whisper 模型（约 1.5GB），之后会缓存。想快速体验可把 `.env` 中的 `WHISPER_MODEL_SIZE` 改成 `tiny`。
 
@@ -128,7 +131,10 @@ cp .env.example .env        # Edit .env, set LLM_API_KEY
 docker compose up -d
 ```
 
-Open http://localhost:8080 and paste a link.
+On first launch, enter an activation key. Follow the accounts below to get one:
+
+[![Twitter](https://img.shields.io/badge/-Twitter-1DA1F2?logo=x&logoColor=white)](https://x.com/YeeSin2026)
+[![GitHub](https://img.shields.io/badge/-GitHub-181717?logo=github&logoColor=white)](https://github.com/YeeSin2026)
 
 > 💡 First launch downloads the Whisper model (~1.5GB, cached thereafter). Set `WHISPER_MODEL_SIZE=tiny` in `.env` for a faster first experience.
 

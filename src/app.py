@@ -38,6 +38,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from jinja2 import Environment, FileSystemLoader
 
 from . import __version__, config
+from .activation import is_activated, activate as do_activate
 from .knowledge_store import KnowledgeStore
 from .task_queue import create_job, get_job, list_jobs, set_config as tq_set_config, get_config as tq_get_config
 from .video_processor import extract_url
@@ -64,6 +65,47 @@ jinja_env.globals["VERSION"] = __version__
 def _render(name: str, **kwargs) -> str:
     """渲染模板并返回 HTML 字符串。"""
     return jinja_env.get_template(name).render(**kwargs)
+
+
+# ── 激活码验证中间件 ──
+@app.middleware("http")
+async def activation_middleware(request: Request, call_next):
+    """拦截所有请求，未激活时跳转到激活页面。"""
+    # 允许静态资源和激活相关请求通过
+    path = request.url.path
+    allowed = ["/activate", "/api/activate", "/static", "/favicon.ico"]
+    if any(path.startswith(p) for p in allowed):
+        return await call_next(request)
+
+    # 已激活则放行
+    if is_activated():
+        return await call_next(request)
+
+    # 未激活 — API 请求返回 403，页面请求显示激活页
+    if path.startswith("/api/"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            {"error": "activation_required", "message": "请先激活 · Activation required"},
+            status_code=403,
+        )
+    return HTMLResponse(_render("activate.html"), status_code=403)
+
+
+@app.get("/activate")
+async def activate_page(request: Request):
+    """激活页面。"""
+    if is_activated():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("/dashboard")
+    return HTMLResponse(_render("activate.html"))
+
+
+@app.post("/api/activate")
+async def activate_api(key: str = Form(...)):
+    """验证激活码。"""
+    if do_activate(key):
+        return {"ok": True, "message": "激活成功 · Activated"}
+    return {"ok": False, "message": "激活码无效 · Invalid key"}
 
 
 # ── LLM Wiki 路由注册 ──

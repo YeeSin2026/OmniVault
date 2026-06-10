@@ -2,6 +2,7 @@
 CLAUDE.md
 PROJECT_SUMMARY.md
 ROADMAP.md
+scripts/generate_key.py
 __pycache__/
 *.pyc
 .venv/
