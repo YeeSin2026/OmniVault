@@ -75,7 +75,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-打开 **http://localhost:8080**，粘贴链接即可使用。
+打开 http://localhost:8080，粘贴链接即可使用。
 
 > 💡 首次启动会下载 Whisper 模型（约 1.5GB），之后会缓存。如果想快速体验，可以把 `.env` 中的 `WHISPER_MODEL_SIZE` 改成 `tiny`。
 
