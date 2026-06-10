@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}提交链接 — OmniVault{% endblock %}
+{% block content %}
+
+<div class="max-w-4xl mx-auto space-y-5">
+    <div class="mb-5">
+        <h1 class="text-[16px] font-bold text-zinc-900 dark:text-zinc-200">提交链接</h1>
+        <p class="text-[12px] text-zinc-500 dark:text-zinc-400 mt-1">支持多平台，粘贴链接后 AI 自动下载、总结、打标签</p>
+    </div>
+
+    <!-- 使用流程 -->
+    <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5">
+        <div class="flex flex-col md:flex-row gap-6">
+            <div class="flex-1 text-center">
+                <div class="w-8 h-8 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-full flex items-center justify-center text-[13px] font-bold mx-auto mb-2">1</div>
+                <h3 class="text-[13px] font-semibold text-zinc-800 dark:text-zinc-200 mb-1">粘贴链接</h3>
+                <p class="text-[11px] text-zinc-400 dark:text-zinc-500">支持抖音、小红书、YouTube、公众号等平台</p>
+            </div>
+            <div class="flex-1 text-center">
+                <div class="w-8 h-8 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-full flex items-center justify-center text-[13px] font-bold mx-auto mb-2">2</div>
+                <h3 class="text-[13px] font-semibold text-zinc-800 dark:text-zinc-200 mb-1">AI 自动处理</h3>
+                <p class="text-[11px] text-zinc-400 dark:text-zinc-500">后台自动下载、转写、总结、打标签</p>
+            </div>
+            <div class="flex-1 text-center">
+                <div class="w-8 h-8 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-full flex items-center justify-center text-[13px] font-bold mx-auto mb-2">3</div>
+                <h3 class="text-[13px] font-semibold text-zinc-800 dark:text-zinc-200 mb-1">搜索复用</h3>
+                <p class="text-[11px] text-zinc-400 dark:text-zinc-500">在知识库中随时搜索、回顾、导出</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提交表单 -->
+    <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5">
+        <h2 class="text-[14px] font-semibold text-zinc-800 dark:text-zinc-200 mb-1">粘贴链接</h2>
+        <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mb-3">支持多个链接同时提交，每行一个。支持抖音、YouTube、微信公众号、小红书、微博、TikTok、Facebook、X/Twitter 等。</p>
+
+        <form hx-post="/api/submit/html" hx-target="#result" hx-indicator="#loading">
+            <textarea name="urls" rows="5" class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-transparent focus:border-zinc-300 dark:focus:border-zinc-600 focus:bg-white dark:focus:bg-zinc-900 text-[13px] text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500 p-3 font-mono outline-none transition-colors" placeholder="粘贴任意平台链接，每行一个...
+
+例如：
+https://v.douyin.com/xxxxx/
+https://www.youtube.com/watch?v=xxx
+https://mp.weixin.qq.com/s/xxx"></textarea>
+
+            <div class="flex items-center justify-between mt-3">
+                <button type="submit" class="px-5 py-2 bg-zinc-900 dark:bg-white dark:text-zinc-900 text-white text-[13px] font-medium rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50" id="submit-btn">
+                    提交处理
+                </button>
+                <span id="loading" class="htmx-indicator text-[12px] text-zinc-500">处理中...</span>
+            </div>
+        </form>
+
+        <div id="result" class="mt-4"></div>
+    </div>
+
+    <!-- 任务队列 -->
+    <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d" id="jobs-section">
+        <div class="px-5 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+            <h2 class="text-[14px] font-semibold text-zinc-700 dark:text-zinc-200">任务队列</h2>
+            <span class="text-[10px] text-zinc-400 dark:text-zinc-500">每 10 秒刷新</span>
+        </div>
+        <div class="divide-y divide-zinc-100 dark:divide-zinc-800" hx-get="/api/jobs/html?limit=20" hx-trigger="load, every 10s" hx-swap="outerHTML">
+            {% if jobs %}
+                {% for job in jobs %}
+                <div class="px-5 py-3 flex items-center justify-between">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-[12px] text-zinc-700 dark:text-zinc-300 truncate">{{ job.url[:60] }}</div>
+                        <div class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1"><time datetime="{{ job.created_at }}">{{ job.created_at[:19] }}</time></div>
+                    </div>
+                    <div class="ml-3 text-right">
+                        <div>
+                            {% if job.status == 'done' %}
+                            <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">完成</span>
+                            {% elif job.status == 'failed' %}
+                            <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400">失败</span>
+                            {% elif job.status == 'processing' %}
+                            <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">处理中</span>
+                            {% else %}
+                            <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">等待中</span>
+                            {% endif %}
+                        </div>
+                        {% if job.status == 'failed' and job.error %}
+                        <div class="text-[10px] text-red-500 dark:text-red-400 mt-1 max-w-xs truncate">{{ job.error[:80] }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="px-5 py-10 text-center text-[12px] text-zinc-400 dark:text-zinc-500">暂无任务</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    document.querySelector('form').addEventListener('submit', function() {
+        document.getElementById('submit-btn').disabled = true;
+    });
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail.target.id === 'result') {
+            document.getElementById('submit-btn').disabled = false;
+        }
+    });
+</script>
+
+{% endblock %}

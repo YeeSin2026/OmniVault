@@ -1,0 +1,50 @@
+services:
+  omnivault:
+    build: .
+    image: omnivault:3.1.0
+    container_name: omnivault
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # 持久化数据（知识库、任务队列、cookies）
+      - omnivault-data:/data
+      # Whisper 模型缓存（跨重启保留，避免重复下载）
+      - whisper-cache:/root/.cache/faster-whisper
+      # Embedding 模型缓存（跨重启保留 BGE-small-zh）
+      - embedding-cache:/root/.cache/omnivault/embeddings
+      # Obsidian Vault（LLM Wiki 输出到本地 Obsidian 仓库，可选）
+      # 取消注释并替换为你的 Obsidian Vault 路径：
+      # - /你的本地路径/obsidian-vault:/vault
+    environment:
+      # LLM API（支持任何 OpenAI 格式的服务商: DeepSeek/通义千问/GLM/OpenAI 等）
+      # 优先读 LLM_*，兼容旧配置 DEEPSEEK_*
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-}
+      - FEISHU_APP_ID=${FEISHU_APP_ID:-}
+      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET:-}
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-medium}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - WEBHOOK_TYPE=${WEBHOOK_TYPE:-}
+      - DOUYIN_LOGIN_ENABLED=${DOUYIN_LOGIN_ENABLED:-false}
+      - MAX_COMMENTS_PER_VIDEO=${MAX_COMMENTS_PER_VIDEO:-50}
+      - KNOWLEDGE_DB_PATH=/data/knowledge.db
+      - JOBS_DB_PATH=/data/jobs.db
+      - COOKIES_FILE_PATH=/data/.douyin_cookies.json
+      - TEMP_DIR=/tmp/omnivault
+      - TZ=Etc/UTC
+      - PORT=8080
+      - HOST=0.0.0.0
+      # Obsidian Vault（可选，映射到主机的 Obsidian 文件夹自动写入）
+      - OBSIDIAN_VAULT_PATH=${OBSIDIAN_VAULT_PATH:-}
+    tmpfs:
+      - /tmp/omnivault:size=500M
+
+volumes:
+  omnivault-data:
+  whisper-cache:
+  embedding-cache:

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}搜索 — OmniVault{% endblock %}
+{% block content %}
+
+<div class="max-w-4xl mx-auto">
+    <div class="mb-6">
+        <h1 class="text-[16px] font-bold text-zinc-900 dark:text-zinc-200">知识搜索</h1>
+        <p class="text-[12px] text-zinc-500 dark:text-zinc-400 mt-1">支持自然语言搜索，例如"之前那个讲多 Agent 协作的"</p>
+    </div>
+
+    <!-- 搜索框 -->
+    <form method="get" action="/search" class="mb-6">
+        <div class="flex gap-3">
+            <div class="flex-1 relative">
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ q }}"
+                    placeholder="输入关键词或自然语言描述…"
+                    autofocus
+                    class="w-full px-4 py-3 text-[14px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600 focus:border-transparent text-zinc-900 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-500 shadow-2d"
+                >
+            </div>
+            <button type="submit"
+                    class="px-6 py-3 text-[13px] font-medium bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors shadow-2d">
+                搜索
+            </button>
+        </div>
+
+        <!-- 搜索模式 -->
+        <div class="flex items-center gap-2 mt-3">
+            <span class="text-[11px] text-zinc-400 dark:text-zinc-500">模式:</span>
+            {% for m in [('hybrid', '混合'), ('semantic', '语义'), ('keyword', '关键词')] %}
+            <label class="flex items-center gap-1 text-[12px] text-zinc-600 dark:text-zinc-400 cursor-pointer">
+                <input type="radio" name="mode" value="{{ m[0] }}" {% if mode == m[0] %}checked{% endif %}
+                       class="text-zinc-800 dark:text-zinc-300 focus:ring-zinc-400">
+                {{ m[1] }}
+            </label>
+            {% endfor %}
+        </div>
+    </form>
+
+    <!-- 搜索结果 -->
+    {% if has_searched %}
+        <div class="mb-4">
+            <span class="text-[12px] text-zinc-500 dark:text-zinc-400">
+                找到 <strong class="text-zinc-700 dark:text-zinc-300">{{ results|length }}</strong> 条结果 · 模式: <span class="text-zinc-600 dark:text-zinc-300">{{ {'hybrid':'混合','semantic':'语义','keyword':'关键词'}[mode] }}</span>
+            </span>
+        </div>
+
+        {% if results %}
+        <div class="space-y-3">
+            {% for entry in results %}
+            <a href="/videos/{{ entry.id }}"
+               class="block bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5 hover:shadow-2d-hover hover:border-zinc-300 dark:hover:border-zinc-700 transition-all group">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-[14px] font-semibold text-zinc-800 dark:text-zinc-200 group-hover:text-zinc-900 dark:group-hover:text-zinc-100 mb-1.5 line-clamp-1">
+                            {{ entry.title }}
+                        </h3>
+                        <p class="text-[12px] text-zinc-500 dark:text-zinc-400 line-clamp-2 mb-2">
+                            {{ (entry.summary_markdown or '')[:200] }}
+                        </p>
+                        <div class="flex flex-wrap items-center gap-2 text-[10px] text-zinc-400 dark:text-zinc-500">
+                            <span>{{ entry.author or '未知' }}</span>
+                            {% if entry.platform %}
+                            <span class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800">{{ entry.platform }}</span>
+                            {% endif %}
+                            {% if entry.content_type %}
+                            <span class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800">{{ entry.content_type }}</span>
+                            {% endif %}
+                            {% if entry.tags %}
+                            {% for tag in (entry.tags or '').split(',')[:3] %}
+                            <span class="text-zinc-400 dark:text-zinc-500">#{{ tag.strip() }}</span>
+                            {% endfor %}
+                            {% endif %}
+                            <span><time datetime="{{ entry.created_at }}">{{ entry.created_at[:10] }}</time></span>
+                        </div>
+                    </div>
+                    <div class="shrink-0 text-zinc-300 dark:text-zinc-600 group-hover:text-zinc-500 dark:group-hover:text-zinc-400 transition-colors">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 4L10 8L6 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-20">
+            <p class="text-[13px] text-zinc-400 dark:text-zinc-500">没有找到匹配的结果</p>
+            <p class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">试试换一种说法，或切换到「语义」模式</p>
+        </div>
+        {% endif %}
+    {% else %}
+        <!-- 空状态 — 展示搜索建议 -->
+        <div class="text-center py-16">
+            <p class="text-[13px] text-zinc-400 dark:text-zinc-500 mb-4">输入任意关键词或自然语言描述来搜索你的知识库</p>
+            <div class="flex flex-wrap justify-center gap-2 max-w-md mx-auto">
+                <span class="text-[11px] px-3 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">试试：多 Agent 协作框架</span>
+                <span class="text-[11px] px-3 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">试试：AI 视频生成工具</span>
+                <span class="text-[11px] px-3 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">试试：之前看到的那个数字人</span>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+{% endblock %}

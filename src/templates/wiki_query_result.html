@@ -1,0 +1,105 @@
+<!-- wiki_query_result.html — HTMX 部分刷新，Wiki Query vs RAG 对比结果 -->
+<div class="space-y-6">
+    <!-- 双栏对比 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- 左：Wiki Query 结果 -->
+        <div class="bg-white dark:bg-zinc-800 rounded-xl border border-green-200 dark:border-green-800 shadow-2d overflow-hidden">
+            <div class="px-4 py-3 bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-800 flex items-center justify-between">
+                <span class="text-sm font-semibold text-green-800 dark:text-green-300">
+                    🧠 Wiki Query
+                    {% if wiki.query_variations %}<span class="text-xs font-normal ml-1">({{ wiki.query_variations }} 路查询)</span>{% endif %}
+                </span>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-300">
+                    {{ wiki.confidence or '?' }}
+                </span>
+            </div>
+            <div class="p-4">
+                {% if wiki.answer %}
+                <div class="entry-content text-sm leading-relaxed">
+                    {{ wiki.answer | safe }}
+                </div>
+                {% else %}
+                <p class="text-zinc-400 text-sm">未找到相关答案</p>
+                {% endif %}
+            </div>
+            {% if wiki.sources %}
+            <div class="px-4 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-100 dark:border-zinc-700">
+                <div class="text-xs text-zinc-500">
+                    <span class="font-medium">📎 引用来源 ({{ wiki.sources|length }}):</span>
+                    {% for src in wiki.sources %}
+                    <code class="ml-1 text-xs bg-zinc-200 dark:bg-zinc-700 px-1.5 py-0.5 rounded">{{ src }}</code>
+                    {% endfor %}
+                    {% if wiki.expansions_used %}
+                    <span class="ml-2 text-green-600 dark:text-green-400">↳ {{ wiki.expansions_used }} 页图谱扩展</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 右：RAG 搜索结果 -->
+        <div class="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-2d overflow-hidden">
+            <div class="px-4 py-3 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-700">
+                <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">🔍 RAG 搜索 (hybrid)</span>
+            </div>
+            <div class="divide-y divide-zinc-100 dark:divide-zinc-700 max-h-[500px] overflow-y-auto">
+                {% if rag_items %}
+                {% for item in rag_items %}
+                <div class="p-4 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-colors">
+                    <div class="flex items-start justify-between gap-2">
+                        <a href="/videos/{{ item.id }}" class="text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-blue-600 dark:hover:text-blue-400 line-clamp-2">
+                            {{ item.title or '未命名' }}
+                        </a>
+                        {% if item.score %}
+                        <span class="shrink-0 text-xs text-zinc-400 font-mono">{{ "%.2f"|format(item.score) }}</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">{{ item.summary_preview }}</p>
+                    {% if item.tags %}
+                    <div class="flex gap-1 mt-2 flex-wrap">
+                        {% for tag in item.tags.split(',')[:3] %}
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400">{{ tag.strip() }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="p-8 text-center text-sm text-zinc-400">无结果</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 召回分析 -->
+    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 text-sm">
+        <div class="font-semibold text-amber-800 dark:text-amber-300 mb-2">📊 召回分析</div>
+        <div class="grid grid-cols-3 gap-4 text-xs text-amber-700 dark:text-amber-400">
+            <div>
+                <div class="font-medium">Wiki Query 使用了</div>
+                <ul class="mt-1 space-y-0.5">
+                    <li>• LLM 语义索引选页</li>
+                    <li>• {{ wiki.query_variations or 1 }} 路查询改写</li>
+                    <li>• [[wikilink]] 图谱扩展 {{ wiki.expansions_used or 0 }} 页</li>
+                    <li>• LLM 重排序</li>
+                </ul>
+            </div>
+            <div>
+                <div class="font-medium">RAG 搜索使用了</div>
+                <ul class="mt-1 space-y-0.5">
+                    <li>• BGE-small-zh 向量匹配</li>
+                    <li>• FTS5 关键词匹配</li>
+                    <li>• RRF 融合排序</li>
+                </ul>
+            </div>
+            <div>
+                <div class="font-medium">差异原因</div>
+                <ul class="mt-1 space-y-0.5">
+                    <li>• Wiki 索引是 LLM「理解后写的」</li>
+                    <li>• 图谱扩展发现了向量搜不到的关系</li>
+                    <li>• 查询改写覆盖更多角度</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

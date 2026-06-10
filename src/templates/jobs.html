@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}任务队列 — OmniVault{% endblock %}
+{% block content %}
+
+<div class="mb-5">
+    <h1 class="text-[16px] font-bold text-zinc-900 dark:text-zinc-200">任务队列</h1>
+    <p class="text-[12px] text-zinc-500 dark:text-zinc-400 mt-1">查看和管理所有知识采集任务</p>
+</div>
+
+<div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d overflow-hidden">
+    {% if jobs %}
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr class="border-b border-zinc-100 dark:border-zinc-800">
+                    <th class="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">ID</th>
+                    <th class="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">链接</th>
+                    <th class="text-center px-5 py-3 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">状态</th>
+                    <th class="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">进度</th>
+                    <th class="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">提交时间</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800" hx-get="/api/jobs?limit=50" hx-trigger="every 5s" hx-swap="outerHTML">
+                {% for job in jobs %}
+                <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                    <td class="px-5 py-3 text-[10px] font-mono text-zinc-400 dark:text-zinc-500">{{ job.id[:8] }}</td>
+                    <td class="px-5 py-3 text-[12px] text-zinc-700 dark:text-zinc-300 max-w-xs truncate">{{ job.url[:60] }}</td>
+                    <td class="px-5 py-3 text-center">
+                        {% if job.status == 'done' %}
+                        <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">完成</span>
+                        {% elif job.status == 'failed' %}
+                        <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400">失败</span>
+                        {% elif job.status == 'processing' %}
+                        <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">处理中</span>
+                        {% else %}
+                        <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">等待中</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-3 text-[11px] text-zinc-400 dark:text-zinc-500">
+                        {% if job.progress and job.progress.step %}
+                            {{ job.progress.step }} ({{ job.progress.progress }}%)
+                        {% elif job.status == 'done' %}
+                            100%
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-3 text-[10px] text-zinc-400 dark:text-zinc-500 font-mono"><time datetime="{{ job.created_at }}">{{ job.created_at[:16] }}</time></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="flex flex-col items-center justify-center py-20 text-zinc-400 dark:text-zinc-500">
+        <p class="text-[13px]">暂无任务</p>
+        <p class="text-[11px] mt-1">去<a href="/submit" class="text-zinc-600 dark:text-zinc-400 underline">提交链接</a>开始采集</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}LLM Wiki — OmniVault{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <!-- 页头 -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">🧠 LLM Wiki</h1>
+            <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                Karpathy 模式 — 人在策展，LLM 在编写和维护
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="window.location.href='/wiki/query'"
+                    class="px-4 py-2 text-sm rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors">
+                🔮 查询
+            </button>
+            <button onclick="window.location.href='/wiki/lint'"
+                    class="px-4 py-2 text-sm rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors">
+                🔍 健康检查
+            </button>
+            <button onclick="rebuildIndex()"
+                    class="px-4 py-2 text-sm rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:opacity-80 transition-opacity">
+                🔄 重建索引
+            </button>
+        </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white dark:bg-zinc-800 rounded-xl p-5 border border-zinc-200 dark:border-zinc-700 shadow-2d">
+            <div class="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{{ stats.total_pages }}</div>
+            <div class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Wiki 页面</div>
+        </div>
+        {% for cat, count in stats.categories.items() %}
+        <div class="bg-white dark:bg-zinc-800 rounded-xl p-5 border border-zinc-200 dark:border-zinc-700 shadow-2d">
+            <div class="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{{ count }}</div>
+            <div class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{{ cat }}</div>
+        </div>
+        {% endfor %}
+        {% if not stats.categories %}
+        <div class="bg-white dark:bg-zinc-800 rounded-xl p-5 border border-zinc-200 dark:border-zinc-700 shadow-2d col-span-3">
+            <div class="text-sm text-zinc-400 dark:text-zinc-500">暂无 Wiki 页面，编译你的第一条知识后自动生成</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Wiki 根路径 -->
+    <div class="bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-3 text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+        📁 {{ stats.wiki_root }}
+        {% if not stats.exists %}
+        <span class="text-amber-500 ml-2">（目录尚未创建，首次编译时自动初始化）</span>
+        {% endif %}
+    </div>
+
+    <!-- 双栏布局 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- 左：最近知识条目（可编译） -->
+        <div class="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-2d">
+            <div class="p-4 border-b border-zinc-100 dark:border-zinc-700 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">📋 知识条目</h2>
+                <span class="text-xs text-zinc-400">{{ recent_entries|length }} 条</span>
+            </div>
+            <div class="divide-y divide-zinc-100 dark:divide-zinc-700 max-h-96 overflow-y-auto">
+                {% if recent_entries %}
+                {% for entry in recent_entries %}
+                <div class="p-4 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-colors">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <a href="/videos/{{ entry.id }}" class="text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:text-blue-600 dark:hover:text-blue-400 truncate block">
+                                {{ entry.title or '未命名' }}
+                            </a>
+                            <div class="flex items-center gap-2 mt-1 text-xs text-zinc-400">
+                                <span>{{ entry.platform or '?' }}</span>
+                                <span>·</span>
+                                <span>{{ entry.author or '未知作者' }}</span>
+                                {% if entry.tags %}
+                                <span>·</span>
+                                <span class="text-zinc-300">{{ entry.tags[:40] }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <button onclick="compileEntry({{ entry.id }}, this)"
+                                class="shrink-0 px-3 py-1.5 text-xs rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors font-medium">
+                            🧠 编译
+                        </button>
+                    </div>
+                    <div id="compile-status-{{ entry.id }}" class="mt-2 hidden"></div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="p-8 text-center text-sm text-zinc-400">
+                    暂无知识条目，<a href="/submit" class="text-blue-500 hover:underline">先去采集内容</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 右：操作日志 -->
+        <div class="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-2d">
+            <div class="p-4 border-b border-zinc-100 dark:border-zinc-700">
+                <h2 class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">📝 操作日志</h2>
+            </div>
+            <div class="p-4 max-h-96 overflow-y-auto">
+                {% if recent_log and recent_log != '（暂无操作日志）' %}
+                <pre class="text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap font-mono leading-relaxed">{{ recent_log }}</pre>
+                {% else %}
+                <div class="text-center text-sm text-zinc-400 py-8">
+                    🕳️ 暂无操作日志<br>
+                    <span class="text-xs">编译第一条知识后自动生成</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部提示 -->
+    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 text-sm text-amber-800 dark:text-amber-300">
+        <strong>💡 工作流程：</strong>
+        知识条目 → AI 三段式总结 → <strong>LLM Wiki 编译</strong>（提取实体/概念/交叉引用）→ Obsidian Vault<br>
+        <span class="text-xs text-amber-600 dark:text-amber-400 mt-1 block">
+            Wiki 页面全部由 LLM 编写和维护，你只负责策展素材和审核方向。
+        </span>
+    </div>
+</div>
+
+<script>
+async function compileEntry(entryId, btn) {
+    const statusDiv = document.getElementById('compile-status-' + entryId);
+    btn.disabled = true;
+    btn.textContent = '⏳ 编译中...';
+
+    statusDiv.className = 'mt-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-sm text-blue-700 dark:text-blue-300';
+    statusDiv.innerHTML = '🔍 LLM 正在分析内容，提取实体和概念...';
+    statusDiv.classList.remove('hidden');
+
+    try {
+        const formData = new FormData();
+        formData.append('entry_id', entryId);
+
+        const resp = await fetch('/wiki/api/wiki/compile', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await resp.json();
+
+        if (data.error) {
+            statusDiv.className = 'mt-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-sm text-red-700 dark:text-red-300';
+            statusDiv.innerHTML = '❌ 编译失败: ' + data.error;
+        } else if (data.skipped) {
+            statusDiv.className = 'mt-2 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800 text-sm text-zinc-600 dark:text-zinc-400';
+            statusDiv.innerHTML = '⏭️ 跳过（无摘要内容）';
+        } else {
+            const newPages = data.new_pages || [];
+            const updatedPages = data.updated_pages || [];
+            statusDiv.className = 'mt-2 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 text-sm text-green-700 dark:text-green-300';
+            statusDiv.innerHTML = `
+                ✅ 编译完成！
+                ${newPages.length > 0 ? '<br>🆕 新建: ' + newPages.map(p => '<code>' + p + '</code>').join(', ') : ''}
+                ${updatedPages.length > 0 ? '<br>📝 更新: ' + updatedPages.map(p => '<code>' + p + '</code>').join(', ') : ''}
+                ${data.entities_found ? '<br>🔍 提取 ' + data.entities_found + ' 个实体, ' + data.concepts_found + ' 个概念' : ''}
+            `;
+            // 5秒后刷新页面
+            setTimeout(() => location.reload(), 3000);
+        }
+    } catch(e) {
+        statusDiv.className = 'mt-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-sm text-red-700 dark:text-red-300';
+        statusDiv.innerHTML = '❌ 请求失败: ' + e.message;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🧠 编译';
+    }
+}
+
+async function rebuildIndex() {
+    if (!confirm('确定要重建整个 _index.md 吗？这将扫描所有已有 Wiki 页面。')) return;
+
+    try {
+        const resp = await fetch('/wiki/api/wiki/rebuild-index', { method: 'POST' });
+        const data = await resp.json();
+        if (data.status === 'ok') {
+            alert('索引已重建！共 ' + (data.size || '?') + ' 字符');
+            location.reload();
+        } else {
+            alert('重建失败: ' + (data.detail || '未知错误'));
+        }
+    } catch(e) {
+        alert('请求失败: ' + e.message);
+    }
+}
+</script>
+{% endblock %}

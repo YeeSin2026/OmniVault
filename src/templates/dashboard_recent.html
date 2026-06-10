@@ -1,0 +1,25 @@
+<div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d" id="recent-content">
+    <div class="px-5 py-3 border-b border-zinc-100 dark:border-zinc-800 text-[14px] font-semibold text-zinc-700 dark:text-zinc-200">最近内容</div>
+    <div class="divide-y divide-zinc-100 dark:divide-zinc-800">
+        {% if recent %}
+            {% for entry in recent %}
+            <a href="/videos/{{ entry.id }}" class="block px-5 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                <div class="flex items-center gap-2">
+                    <div class="text-[13px] font-medium text-zinc-800 dark:text-zinc-200 flex-1 truncate">{{ entry.title[:50] }}{% if entry.title|length > 50 %}...{% endif %}</div>
+                    <span class="text-[9px] px-2 py-0.5 rounded-full shrink-0 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+                        {{ entry.platform or '?' }}
+                    </span>
+                </div>
+                <div class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">
+                    <span>{{ entry.author }}</span>
+                    {% if entry.tags %}
+                    <span class="ml-2 text-zinc-400 dark:text-zinc-500">{{ entry.tags.split(',')[:3]|join(', ') }}</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        {% else %}
+            <div class="px-5 py-10 text-center text-[12px] text-zinc-400 dark:text-zinc-500">暂无内容，去<a href="/submit" class="text-zinc-600 dark:text-zinc-400 underline">提交链接</a></div>
+        {% endif %}
+    </div>
+</div>

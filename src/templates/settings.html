@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}设置 — OmniVault{% endblock %}
+{% block content %}
+
+<div class="max-w-2xl mx-auto space-y-5">
+    <div class="mb-5">
+        <h1 class="text-[16px] font-bold text-zinc-900 dark:text-zinc-200">设置</h1>
+        <p class="text-[12px] text-zinc-500 dark:text-zinc-400 mt-1">配置 Webhook、Cookies、导出和系统参数</p>
+    </div>
+
+    <!-- Webhook 配置 -->
+    <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5">
+        <h2 class="text-[14px] font-semibold text-zinc-700 dark:text-zinc-200 mb-3">Webhook 通知</h2>
+        <p class="text-[12px] text-zinc-500 dark:text-zinc-400 mb-4">内容处理完成时发送通知到指定服务。</p>
+
+        <form hx-post="/api/config" hx-target="#webhook-result" class="space-y-3">
+            <div>
+                <label class="block text-[12px] font-medium text-zinc-700 dark:text-zinc-300 mb-1">Webhook URL</label>
+                <input type="text" name="webhook_url" value="{{ webhook_url or '' }}" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/xxx" class="w-full px-3 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-transparent focus:border-zinc-300 dark:focus:border-zinc-600 focus:bg-white dark:focus:bg-zinc-900 text-[13px] text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 outline-none transition-colors">
+            </div>
+            <div>
+                <label class="block text-[12px] font-medium text-zinc-700 dark:text-zinc-300 mb-1">Webhook 类型</label>
+                <select name="webhook_type" class="w-full px-3 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-transparent focus:border-zinc-300 dark:focus:border-zinc-600 text-[13px] text-zinc-700 dark:text-zinc-300 outline-none transition-colors">
+                    <option value="" {% if not webhook_type %}selected{% endif %}>不启用</option>
+                    <option value="feishu" {% if webhook_type == 'feishu' %}selected{% endif %}>飞书群机器人</option>
+                    <option value="wechat" {% if webhook_type == 'wechat' %}selected{% endif %}>企业微信机器人</option>
+                    <option value="generic" {% if webhook_type == 'generic' %}selected{% endif %}>通用 JSON</option>
+                </select>
+            </div>
+            <button type="submit" class="px-4 py-2 bg-zinc-900 dark:bg-white dark:text-zinc-900 text-white text-[12px] font-medium rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors">保存配置</button>
+        </form>
+        <div id="webhook-result" class="mt-2"></div>
+    </div>
+
+    <!-- 登录 Cookies -->
+    <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5">
+        <h2 class="text-[14px] font-semibold text-zinc-700 dark:text-zinc-200 mb-3">平台登录</h2>
+        <p class="text-[12px] text-zinc-500 dark:text-zinc-400 mb-4">上传 cookies 后可获取需要登录态的评论和内容。适用于抖音、小红书、微博等平台。</p>
+
+        <div class="flex items-center gap-3 mb-4">
+            <span class="text-[12px] text-zinc-600 dark:text-zinc-300">当前状态：</span>
+            <span id="login-status-badge">
+                {% if logged_in %}
+                <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">已登录</span>
+                {% else %}
+                <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">未登录</span>
+                {% endif %}
+            </span>
+        </div>
+
+        <div class="border-2 border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg p-5 text-center">
+            <p class="text-[12px] text-zinc-500 dark:text-zinc-400 mb-3">将浏览器中导出的 cookies.json 上传</p>
+            <form hx-post="/api/login/upload-cookies" hx-target="#cookies-result" enctype="multipart/form-data" class="space-y-3">
+                <input type="file" name="file" accept=".json" class="block mx-auto text-[12px] text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-[12px] file:font-medium file:bg-zinc-100 dark:file:bg-zinc-800 file:text-zinc-700 dark:file:text-zinc-300 hover:file:bg-zinc-200 dark:hover:file:bg-zinc-700">
+                <button type="submit" class="px-4 py-2 bg-zinc-900 dark:bg-white dark:text-zinc-900 text-white text-[12px] font-medium rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors">上传 cookies</button>
+            </form>
+            <div id="cookies-result" class="mt-2"></div>
+        </div>
+
+        <details class="mt-3">
+            <summary class="text-[12px] text-zinc-500 dark:text-zinc-400 cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-200">如何获取 cookies？</summary>
+            <div class="mt-2 text-[12px] text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800 rounded-lg p-3 space-y-1">
+                <p>1. 在电脑浏览器中打开目标平台网站并登录</p>
+                <p>2. 按 F12 打开开发者工具，切换到 Application 标签</p>
+                <p>3. 左侧选择 Cookies → 对应域名</p>
+                <p>4. 右键任意 cookie → 全部导出为 JSON</p>
+                <p>5. 将 JSON 文件上传到本页面</p>
+                <p class="text-amber-600 dark:text-amber-400">⚠ 注意：cookies 会过期，需定期更新</p>
+            </div>
+        </details>
+    </div>
+
+    <!-- Obsidian / Markdown -->
+    <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5">
+        <h2 class="text-[14px] font-semibold text-zinc-700 dark:text-zinc-200 mb-3">Obsidian / Markdown 导出</h2>
+        <p class="text-[12px] text-zinc-500 dark:text-zinc-400 mb-4">内容处理完成后自动写入 Obsidian vault，或手动批量导出为 Markdown 文件。</p>
+
+        <div class="flex items-center gap-3 mb-4">
+            <span class="text-[12px] text-zinc-600 dark:text-zinc-300">Vault 路径：</span>
+            <span id="obsidian-status">
+                {% if config.OBSIDIAN_VAULT_PATH %}
+                <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">已配置: {{ config.OBSIDIAN_VAULT_PATH }}</span>
+                {% else %}
+                <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">未配置</span>
+                {% endif %}
+            </span>
+        </div>
+
+        <div class="space-y-3">
+            <div>
+                <span class="text-[12px] text-zinc-600 dark:text-zinc-300">Vault 中已有条目：</span>
+                <span class="text-[13px] font-mono text-zinc-800 dark:text-zinc-200"><span id="obsidian-count">-</span></span>
+            </div>
+            <div class="flex gap-3">
+                <a href="/api/export/markdown"
+                   class="inline-block px-4 py-2 bg-zinc-900 dark:bg-white dark:text-zinc-900 text-white text-[12px] font-medium rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors">
+                    导出全部为 Markdown (.zip)
+                </a>
+                <button onclick="refreshObsidianStatus()"
+                        class="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 text-[12px] font-medium rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                    刷新状态
+                </button>
+            </div>
+            <div id="obsidian-status-detail" class="text-[10px] text-zinc-500 dark:text-zinc-400"></div>
+        </div>
+
+        <details class="mt-4">
+            <summary class="text-[12px] text-zinc-500 dark:text-zinc-400 cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-200">如何配置 Obsidian 集成？</summary>
+            <div class="mt-2 text-[12px] text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800 rounded-lg p-3 space-y-1">
+                <p>1. 将 Obsidian vault 目录挂载到容器：在 <code class="bg-zinc-200 dark:bg-zinc-700 px-1 rounded text-[11px]">docker-compose.yml</code> 中添加：</p>
+                <pre class="bg-zinc-200 dark:bg-zinc-700 p-2 rounded text-[11px] mt-1 overflow-x-auto">volumes:
+  - /本地/obsidian-vault路径:/vault</pre>
+                <p>2. 在 <code class="bg-zinc-200 dark:bg-zinc-700 px-1 rounded text-[11px]">.env</code> 中设置：<code class="bg-zinc-200 dark:bg-zinc-700 px-1 rounded text-[11px]">OBSIDIAN_VAULT_PATH=/vault</code></p>
+                <p>3. 重启容器后生效</p>
+            </div>
+        </details>
+    </div>
+
+    <!-- 系统信息 -->
+    <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5">
+        <h2 class="text-[14px] font-semibold text-zinc-700 dark:text-zinc-200 mb-3">系统信息</h2>
+        <div class="text-[12px] text-zinc-600 dark:text-zinc-400 space-y-2">
+            <div class="flex justify-between py-1 border-b border-zinc-100 dark:border-zinc-800">
+                <span>Whisper 模型</span>
+                <span class="font-mono text-[11px]">{{ whisper_model }}</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-zinc-100 dark:border-zinc-800">
+                <span>LLM 模型</span>
+                <span class="font-mono text-[11px]">{{ llm_model }}</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-zinc-100 dark:border-zinc-800">
+                <span>LLM 服务地址</span>
+                <span class="font-mono text-[10px]">{{ llm_base_url }}</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-zinc-100 dark:border-zinc-800">
+                <span>最大评论数</span>
+                <span>{{ max_comments }}</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-zinc-100 dark:border-zinc-800">
+                <span>知识库路径</span>
+                <span class="font-mono text-[10px]">{{ db_path }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function refreshObsidianStatus() {
+        fetch('/api/obsidian/status')
+            .then(r => r.json())
+            .then(data => {
+                const el = document.getElementById('obsidian-status-detail');
+                if (data.configured) {
+                    el.innerHTML = 'Vault 路径: ' + data.vault_path + ' | 条目数: ' + data.entry_count + ' | 目录存在: ' + (data.exists ? '✓' : '✗');
+                } else {
+                    el.innerHTML = '未配置 Obsidian vault，可通过导出按钮下载 .zip 文件。';
+                }
+            });
+    }
+    document.addEventListener('DOMContentLoaded', refreshObsidianStatus);
+
+    document.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail.target.id === 'cookies-result' || evt.detail.target.id === 'webhook-result') {
+            setTimeout(function() {
+                evt.detail.target.innerHTML = '';
+            }, 5000);
+        }
+    });
+</script>
+
+{% endblock %}

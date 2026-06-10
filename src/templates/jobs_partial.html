@@ -1,0 +1,28 @@
+<div class="divide-y divide-zinc-100 dark:divide-zinc-800">
+    {% if jobs %}
+        {% for job in jobs %}
+        <div class="px-5 py-3 flex items-center justify-between">
+            <div class="flex-1 min-w-0">
+                <div class="text-[12px] text-zinc-700 dark:text-zinc-300 truncate">{{ job.url[:60] }}</div>
+                {% if job.status == 'failed' and job.error %}
+                <div class="text-[10px] text-red-500 dark:text-red-400 mt-1 truncate" title="{{ job.error }}">{{ job.error[:100] }}</div>
+                {% endif %}
+                <div class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1"><time datetime="{{ job.created_at }}">{{ job.created_at[:19] }}</time></div>
+            </div>
+            <div class="ml-3 shrink-0">
+                {% if job.status == 'done' %}
+                <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">完成</span>
+                {% elif job.status == 'failed' %}
+                <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400">失败</span>
+                {% elif job.status == 'processing' %}
+                <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">处理中</span>
+                {% else %}
+                <span class="text-[9px] px-2 py-0.5 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">等待中</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="px-5 py-10 text-center text-[12px] text-zinc-400 dark:text-zinc-500">暂无任务</div>
+    {% endif %}
+</div>

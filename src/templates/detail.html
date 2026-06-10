@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}{{ entry.title[:30] }} — OmniVault{% endblock %}
+{% block content %}
+
+<div class="max-w-4xl mx-auto">
+    <div class="mb-5">
+        <a href="/dashboard" class="text-[13px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors">← 返回仪表盘</a>
+    </div>
+
+    <!-- 标题区 -->
+    <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5 mb-5">
+        <h1 class="text-[16px] font-bold text-zinc-900 dark:text-zinc-200 mb-3">{{ entry.title }}</h1>
+        <div class="flex flex-wrap items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+            <span>{{ entry.author or "未知" }}</span>
+            {% if entry.tags %}
+            <span class="flex gap-1">
+                {% for tag in entry.tags.split(',') %}
+                <span class="text-[9px] px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500">{{ tag.strip() }}</span>
+                {% endfor %}
+            </span>
+            {% endif %}
+            <span class="text-zinc-400 dark:text-zinc-500"><time datetime="{{ entry.created_at }}" datefmt="date">{{ entry.created_at[:10] }}</time></span>
+            {% if entry.content_type %}
+            <span class="text-[9px] px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">{{ entry.content_type }}</span>
+            {% endif %}
+            {% if entry.platform %}
+            <span class="text-[9px] px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500">{{ entry.platform }}</span>
+            {% endif %}
+        </div>
+        {% if entry.source_url %}
+        <a href="{{ entry.source_url }}" target="_blank" class="inline-block mt-3 text-[12px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">查看原文 →</a>
+        {% endif %}
+    </div>
+
+    <!-- AI 总结 -->
+    <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5 mb-5">
+        <h2 class="text-[14px] font-semibold text-zinc-700 dark:text-zinc-200 mb-3">AI 总结</h2>
+        <div class="entry-content text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
+            {{ entry.summary_html | safe }}
+        </div>
+    </div>
+
+    <!-- 高质量评论 -->
+    <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5 mb-6">
+        <h2 class="text-[14px] font-semibold text-zinc-700 dark:text-zinc-200 mb-3">
+            高质量评论
+            <span class="text-[11px] font-normal text-zinc-400 dark:text-zinc-500 ml-2">({{ comments|length }} 条)</span>
+        </h2>
+
+        {% if comments %}
+        <div class="space-y-3">
+            {% for c in comments %}
+            <div class="border border-zinc-100 dark:border-zinc-800 rounded-lg p-3 hover:border-zinc-200 dark:hover:border-zinc-700 transition-all">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-[12px] font-medium text-zinc-800 dark:text-zinc-200">{{ c.user }}</span>
+                    {% if c.likes %}
+                    <span class="text-[10px] text-zinc-400 dark:text-zinc-500">{{ c.likes }} 赞</span>
+                    {% endif %}
+                </div>
+                <p class="text-[12px] text-zinc-600 dark:text-zinc-400">{{ c.content }}</p>
+                {% if c._value_reason %}
+                <p class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">{{ c._value_reason }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center py-12 text-zinc-400 dark:text-zinc-500">
+            <p class="text-[13px]">暂无高质量评论</p>
+            <p class="text-[11px] mt-1">可在<a href="/settings" class="text-zinc-600 dark:text-zinc-400 underline">设置</a>中上传 cookies 获取更多评论</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 相关推荐 -->
+    {% if related %}
+    <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5 mb-5">
+        <h2 class="text-[14px] font-semibold text-zinc-700 dark:text-zinc-200 mb-3">相关阅读</h2>
+        <div class="space-y-2">
+            {% for r in related %}
+            <a href="/videos/{{ r.id }}"
+               class="block p-3 rounded-lg border border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-[13px] text-zinc-700 dark:text-zinc-300 font-medium truncate">{{ r.title }}</p>
+                        <p class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">{{ r.author or '未知' }} · {{ r.platform or '' }} · {{ r.created_at[:10] if r.created_at else '' }}</p>
+                    </div>
+                    {% if r._related_score is defined %}
+                    <span class="text-[10px] text-zinc-400 dark:text-zinc-500 ml-3">相似度 {{ (r._related_score * 100)|round }}%</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 操作 -->
+    <div class="flex items-center justify-center gap-4 pb-12">
+        <button onclick="deleteEntry({{ entry.id }})"
+                class="text-[12px] text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors">
+            删除此条目
+        </button>
+    </div>
+</div>
+
+<script>
+function deleteEntry(entryId) {
+    if (!confirm('确定要删除这条内容吗？此操作不可撤销。')) return;
+    fetch('/api/videos/' + entryId, { method: 'DELETE' })
+        .then(function(r) {
+            if (r.ok) {
+                window.location.href = '/dashboard';
+            } else {
+                alert('删除失败，请重试');
+            }
+        });
+}
+</script>
+
+{% endblock %}

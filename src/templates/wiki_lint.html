@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Wiki 健康检查 — OmniVault{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- 页头 -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">🔍 Wiki 健康检查</h1>
+            <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                检查矛盾、孤儿页面、断链、过期内容
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/wiki" class="px-4 py-2 text-sm rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors">
+                ← 返回 Wiki
+            </a>
+            <button onclick="runLint(false)"
+                    class="px-4 py-2 text-sm rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:opacity-80 transition-opacity">
+                🔍 快速检查
+            </button>
+            <button onclick="runLint(true)"
+                    class="px-4 py-2 text-sm rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors border border-amber-300 dark:border-amber-700">
+                🧠 深度检查 (LLM)
+            </button>
+        </div>
+    </div>
+
+    <!-- 结果区域 -->
+    <div id="lint-results">
+        {% if summary %}
+        <!-- 摘要横幅 -->
+        <div class="p-4 rounded-xl border {%
+            if '✅' in summary %}bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300{%
+            elif '⚠️' in summary %}bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300{%
+            else %}bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300{%
+            endif %}">
+            <p class="font-semibold">{{ summary }}</p>
+            {% if stats %}
+            <div class="flex gap-4 mt-2 text-xs opacity-70">
+                <span>{{ stats.total_pages }} 个页面</span>
+                {% if stats.orphan_count %}<span>{{ stats.orphan_count }} 个孤儿</span>{% endif %}
+                {% if stats.broken_link_count %}<span>{{ stats.broken_link_count }} 个断链</span>{% endif %}
+                {% if stats.stale_count %}<span>{{ stats.stale_count }} 个过期</span>{% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 问题列表 -->
+        {% if issues %}
+        <div class="space-y-3 mt-4">
+            {% for issue in issues %}
+            <div class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 shadow-2d">
+                <div class="flex items-start gap-3">
+                    <span class="shrink-0 mt-0.5">{%
+                        if issue.severity == 'error' %}🔴{%
+                        elif issue.severity == 'warning' %}🟡{%
+                        else %}🔵{%
+                        endif %}</span>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-xs px-2 py-0.5 rounded-full font-mono {%
+                                if issue.type == 'broken_link' %}bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400{%
+                                elif issue.type == 'orphan' %}bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400{%
+                                elif issue.type == 'stale' %}bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400{%
+                                elif issue.type == 'missing_ref' %}bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400{%
+                                else %}bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400{%
+                                endif %}">{{ issue.type }}</span>
+                            <span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{{ issue.page }}</span>
+                        </div>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">{{ issue.description }}</p>
+                        {% if issue.suggestion %}
+                        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-1">💡 {{ issue.suggestion }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-zinc-400 py-12">
+            {% if stats %}
+            ✅ 未发现问题
+            {% else %}
+            👆 点击上方按钮开始检查
+            {% endif %}
+        </div>
+        {% endif %}
+        {% else %}
+        <!-- 初始状态：提示用户操作 -->
+        <div class="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-2d p-12 text-center">
+            <div class="text-4xl mb-4">🔍</div>
+            <p class="text-zinc-600 dark:text-zinc-400 text-sm">
+                点击「快速检查」扫描 Wiki 健康状态，<br>
+                或「深度检查」让 LLM 分析矛盾和不一致。
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+async function runLint(deep) {
+    const resultsDiv = document.getElementById('lint-results');
+    resultsDiv.innerHTML = `
+        <div class="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-2d p-12 text-center">
+            <div class="animate-pulse text-4xl mb-4">⏳</div>
+            <p class="text-zinc-600 dark:text-zinc-400 text-sm">${deep ? 'LLM 深度检查中，可能需要 10-30 秒...' : '正在扫描 Wiki 页面...'}</p>
+        </div>
+    `;
+
+    try {
+        const resp = await fetch('/wiki/api/wiki/lint?deep=' + deep);
+        const html = await resp.text();
+        resultsDiv.innerHTML = html;
+    } catch(e) {
+        resultsDiv.innerHTML = `
+            <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 text-red-700 dark:text-red-300">
+                ❌ 检查失败: ${e.message}
+            </div>
+        `;
+    }
+}
+</script>
+{% endblock %}
