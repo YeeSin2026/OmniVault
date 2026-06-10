@@ -57,7 +57,7 @@ docker compose up -d
 首次打开需输入激活码，关注以下账号获取：
 
 [![Telegram](https://img.shields.io/badge/-Telegram-26A5E4?logo=telegram&logoColor=white)](https://t.me/beta99898)
-[![抖音](https://img.shields.io/badge/-抖音-000000?logo=tiktok&logoColor=white)](https://www.douyin.com/user/43357754345)
+[![抖音](https://img.shields.io/badge/-抖音-FE2C55)](https://www.douyin.com/user/43357754345)
 [![GitHub](https://img.shields.io/badge/-GitHub-181717?logo=github&logoColor=white)](https://github.com/YeeSin2026)
 
 > 💡 首次启动会下载 Whisper 模型（约 1.5GB），之后会缓存。想快速体验可把 `.env` 中的 `WHISPER_MODEL_SIZE` 改成 `tiny`。
@@ -135,7 +135,7 @@ docker compose up -d
 On first launch, enter an activation key. Follow the accounts below to get one:
 
 [![Telegram](https://img.shields.io/badge/-Telegram-26A5E4?logo=telegram&logoColor=white)](https://t.me/beta99898)
-[![Douyin](https://img.shields.io/badge/-Douyin-000000?logo=tiktok&logoColor=white)](https://www.douyin.com/user/43357754345)
+[![Douyin](https://img.shields.io/badge/-Douyin-FE2C55)](https://www.douyin.com/user/43357754345)
 [![GitHub](https://img.shields.io/badge/-GitHub-181717?logo=github&logoColor=white)](https://github.com/YeeSin2026)
 
 > 💡 First launch downloads the Whisper model (~1.5GB, cached thereafter). Set `WHISPER_MODEL_SIZE=tiny` in `.env` for a faster first experience.
