@@ -106,41 +106,6 @@ curl "http://localhost:8080/api/search?q=AI&mode=hybrid"
 
 ---
 
-## 项目结构
-
-```
-src/
-├── app.py              # FastAPI Web 应用 + API 路由
-├── worker.py           # 后台任务消费者
-├── summarizer.py       # AI 三段式总结管道
-├── knowledge_store.py  # 知识库 CRUD + FTS5 + 语义向量搜索
-├── embedding.py        # BGE-small-zh 本地向量模型
-├── video_processor.py  # 抖音内容下载
-├── task_queue.py       # 任务队列
-├── feishu_bot.py       # 飞书 Bot（WebSocket 长连接）
-├── writer.py           # Obsidian Markdown 导出
-├── llm_wiki/           # LLM Wiki 编译引擎（Karpathy 模式）
-├── visual/             # 视觉抓取方案（可选，默认关闭，详见 VISION.md）
-├── platform/           # 多平台适配器（9 个平台）
-└── templates/          # Web 前端页面（Jinja2 + HTMX + Tailwind）
-```
-
----
-
-## 技术栈
-
-| 组件 | 技术 |
-|------|------|
-| 后端 | Python · FastAPI |
-| 前端 | Jinja2 · HTMX · Tailwind CSS |
-| AI 总结 | OpenAI 兼容 API（DeepSeek / 通义千问 / GLM / OpenAI） |
-| 语音转写 | faster-whisper |
-| 向量搜索 | BGE-small-zh · 余弦相似度 · RRF 融合 |
-| 数据库 | SQLite + FTS5 |
-| 部署 | Docker Compose |
-
----
-
 ## 反馈 & 贡献
 
 这是 OmniVault 的轻量发布版，我们正在收集用户反馈。
