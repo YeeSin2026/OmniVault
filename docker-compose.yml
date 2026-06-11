@@ -47,6 +47,19 @@ services:
     tmpfs:
       - /tmp/omnivault:size=500M
 
+  # MCP Server — 可选，按需启动: docker compose --profile mcp up -d
+  mcp:
+    build: .
+    image: omnivault:3.1.0
+    container_name: omnivault-mcp
+    restart: unless-stopped
+    profiles: ["mcp"]
+    ports:
+      - "8085:8085"
+    command: python src/mcp_server.py --port 8085 --host 0.0.0.0
+    environment:
+      - OMNIVAULT_URL=http://omnivault:8080
+
 volumes:
   omnivault-data:
   whisper-cache:

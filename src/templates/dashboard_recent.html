@@ -1,4 +1,4 @@
-<div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d" id="recent-content">
+<div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d" id="recent-content" hx-get="/api/dashboard/recent" hx-trigger="every 15s" hx-swap="outerHTML">
     <div class="px-5 py-3 border-b border-zinc-100 dark:border-zinc-800 text-[14px] font-semibold text-zinc-700 dark:text-zinc-200">最近内容</div>
     <div class="divide-y divide-zinc-100 dark:divide-zinc-800">
         {% if recent %}

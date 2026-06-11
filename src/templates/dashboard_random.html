@@ -1,0 +1,37 @@
+<div id="dashboard-random" hx-get="/api/dashboard/random-picks" hx-trigger="every 60s" hx-swap="outerHTML">
+    {% if picks %}
+    <div class="mb-5">
+        <h2 class="text-[14px] font-semibold text-zinc-700 dark:text-zinc-200 mb-3 flex items-center gap-2">
+            <span>🎲</span> 随机回顾
+            <span class="text-[10px] font-normal text-zinc-400 dark:text-zinc-500">— 7天前的知识，沉底的宝藏</span>
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {% for entry in picks %}
+            <a href="/videos/{{ entry.id }}"
+               class="block bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5 hover:shadow-2d-hover hover:-translate-y-0.5 transition-all group">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-[9px] px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 shrink-0">
+                        {{ entry.platform or '?' }}
+                    </span>
+                    {% if entry.tags %}
+                    {% set tag_list = entry.tags.split(',')[:2] %}
+                    {% for t in tag_list %}
+                    <span class="text-[9px] text-zinc-400 dark:text-zinc-500 truncate">{{ t.strip() }}</span>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+                <h3 class="text-[13px] font-medium text-zinc-800 dark:text-zinc-200 leading-snug mb-2 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors line-clamp-2">
+                    {{ entry.title[:60] }}{% if entry.title|length > 60 %}...{% endif %}
+                </h3>
+                <p class="text-[11px] text-zinc-400 dark:text-zinc-500 leading-relaxed line-clamp-2">
+                    {% if entry.snippet %}{{ entry.snippet }}{% else %}暂无摘要{% endif %}
+                </p>
+                <div class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-3">
+                    {{ entry.author }}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>

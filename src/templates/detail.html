@@ -19,7 +19,7 @@
                 {% endfor %}
             </span>
             {% endif %}
-            <span class="text-zinc-400 dark:text-zinc-500"><time datetime="{{ entry.created_at }}" datefmt="date">{{ entry.created_at[:10] }}</time></span>
+            <span class="text-zinc-400 dark:text-zinc-500"><time datetime="{{ entry.created_at }}"></time></span>
             {% if entry.content_type %}
             <span class="text-[9px] px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">{{ entry.content_type }}</span>
             {% endif %}
@@ -83,7 +83,7 @@
                 <div class="flex items-center justify-between">
                     <div class="flex-1 min-w-0">
                         <p class="text-[13px] text-zinc-700 dark:text-zinc-300 font-medium truncate">{{ r.title }}</p>
-                        <p class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">{{ r.author or '未知' }} · {{ r.platform or '' }} · {{ r.created_at[:10] if r.created_at else '' }}</p>
+                        <p class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">{{ r.author or '未知' }} · {{ r.platform or '' }} · {% if r.created_at %}<time datetime="{{ r.created_at }}"></time>{% endif %}</p>
                     </div>
                     {% if r._related_score is defined %}
                     <span class="text-[10px] text-zinc-400 dark:text-zinc-500 ml-3">相似度 {{ (r._related_score * 100)|round }}%</span>

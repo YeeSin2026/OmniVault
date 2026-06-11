@@ -107,6 +107,37 @@ def mark_done(job_id: str, result: dict = None):
         )
 
 
+def mark_cancelled(job_id: str):
+    """标记任务为已取消。"""
+    now = datetime.now(timezone.utc).isoformat()
+    with _get_db() as conn:
+        conn.execute(
+            "UPDATE jobs SET status='cancelled', result='{}', updated_at=? WHERE id=?",
+            (now, job_id),
+        )
+
+
+def cancel_all_pending() -> int:
+    """取消所有 pending 状态的任务，返回取消数量。"""
+    now = datetime.now(timezone.utc).isoformat()
+    with _get_db() as conn:
+        cur = conn.execute(
+            "UPDATE jobs SET status='cancelled', result='{}', updated_at=? WHERE status='pending'",
+            (now,),
+        )
+        conn.commit()
+        return cur.rowcount
+
+
+def pending_count() -> int:
+    """返回队列中待处理任务数。"""
+    with _get_db() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM jobs WHERE status='pending'"
+        ).fetchone()
+        return row["cnt"]
+
+
 def mark_failed(job_id: str, result: dict = None):
     """标记失败（存储完整的 result dict，包含 error 字段）。"""
     now = datetime.now(timezone.utc).isoformat()

@@ -107,7 +107,7 @@ def _get_whisper_model():
     return _WHISPER_MODEL
 
 
-def _transcribe_with_whisper(audio_path: str) -> str:
+def transcribe_audio(audio_path: str) -> str:
     """faster-whisper 本地转写（使用缓存的模型）。"""
     model = _get_whisper_model()
     logger.info(f"Whisper 转写中 (model={config.WHISPER_MODEL_SIZE})...")
@@ -425,7 +425,7 @@ async def summarize_video(
     if transcript is None:
         await notify("🎙️ 正在语音转写...")
         transcript = await asyncio.get_event_loop().run_in_executor(
-            None, _transcribe_with_whisper, audio_path
+            None, transcribe_audio, audio_path
         )
     else:
         await notify("📄 使用已转写文本")

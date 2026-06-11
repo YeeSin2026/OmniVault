@@ -18,3 +18,4 @@ _test_*.py
 _test_e2e.py
 bot.sh
 *.tar.gz
+data/

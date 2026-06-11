@@ -7,7 +7,7 @@
                 {% if job.status == 'failed' and job.error %}
                 <div class="text-[10px] text-red-500 dark:text-red-400 mt-1 truncate" title="{{ job.error }}">{{ job.error[:100] }}</div>
                 {% endif %}
-                <div class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1"><time datetime="{{ job.created_at }}">{{ job.created_at[:19] }}</time></div>
+                <div class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1"><time datetime="{{ job.created_at }}"></time></div>
             </div>
             <div class="ml-3 shrink-0">
                 {% if job.status == 'done' %}

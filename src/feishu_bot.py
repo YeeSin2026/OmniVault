@@ -312,9 +312,46 @@ def on_message_receive(event) -> None:
     except (json.JSONDecodeError, TypeError):
         content_text = msg.content or ""
 
+    # 处理控制命令: 停止录入 / 停止全部 / 录入状态
+    content_stripped = content_text.strip()
+    if content_stripped in ("停止录入", "停止"):
+        from .worker import stop_current_job, current_job_info
+        info = current_job_info()
+        if not info["current"]:
+            reply_message(msg.message_id, "● 当前没有正在录入的任务")
+        else:
+            stop_current_job()
+            reply_message(msg.message_id, "⏹ 已停止当前录入\n如需继续，重新发送链接即可")
+        return
+    if content_stripped in ("停止全部", "全部停止"):
+        from .worker import stop_all_jobs, current_job_info
+        info = current_job_info()
+        n = (info.get("queue_count", 0) + 1) if info["current"] else info.get("queue_count", 0)
+        stop_all_jobs()
+        reply_message(msg.message_id, f"⏹ 已停止全部录入（取消 {n} 条任务）\n如需继续，重新发送链接即可")
+        return
+    if content_stripped in ("录入状态", "状态"):
+        from .worker import current_job_info
+        info = current_job_info()
+        cur = info["current"]
+        if cur:
+            msg = f"● 正在录入: {cur.get('platform', '?')} — {cur.get('title') or cur.get('url', '')[:50]}"
+            q = info.get("queue_count", 0)
+            if q > 0:
+                msg += f"\n队列中还有 {q} 条等待"
+            msg += "\n发送「停止录入」停止当前 ｜「停止全部」清空队列"
+        else:
+            q = info.get("queue_count", 0)
+            if q > 0:
+                msg = f"● 队列中 {q} 条等待处理\n当前无正在录入的任务"
+            else:
+                msg = "● 空闲，无正在录入或排队的任务"
+        reply_message(msg.message_id, msg)
+        return
+
     # 处理删除命令: "删除 123" 或 "删除123"
     import re as _re
-    del_match = _re.match(r"删除\s*(\d+)", content_text.strip())
+    del_match = _re.match(r"删除\s*(\d+)", content_stripped)
     if del_match:
         entry_id = int(del_match.group(1))
         try:

@@ -1,14 +1,14 @@
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5" id="stats-cards">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5" id="stats-cards" hx-get="/api/dashboard/stats" hx-trigger="every 15s" hx-swap="outerHTML">
     <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5">
         <div class="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">总条目数</div>
         <div class="text-[22px] font-bold text-zinc-900 dark:text-zinc-200 mt-1">{{ stats.total_entries }}</div>
     </div>
     <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5">
-        <div class="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">最新入库</div>
-        <div class="text-[13px] font-semibold text-zinc-800 dark:text-zinc-200 mt-1 truncate">{{ stats.latest_entry or "暂无" }}</div>
+        <div class="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">本周新增</div>
+        <div class="text-[22px] font-bold text-zinc-900 dark:text-zinc-200 mt-1">{{ stats.week_new }}</div>
     </div>
     <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5">
-        <div class="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">数据库路径</div>
-        <div class="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 mt-1 truncate">{{ stats.db_path }}</div>
+        <div class="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">最新入库</div>
+        <div class="text-[13px] font-semibold text-zinc-800 dark:text-zinc-200 mt-1 truncate">{% if stats.latest_entry %}<time datetime="{{ stats.latest_entry }}"></time>{% else %}暂无{% endif %}</div>
     </div>
 </div>

@@ -43,7 +43,7 @@ from .knowledge_store import KnowledgeStore
 from .task_queue import create_job, get_job, list_jobs, set_config as tq_set_config, get_config as tq_get_config
 from .video_processor import extract_url
 from .platform import detect_platform, extract_share_url
-from .worker import start_worker, stop_worker
+from .worker import start_worker, stop_worker, stop_current_job, stop_all_jobs, current_job_info
 from .writer import export_all_to_zip
 from .llm_wiki.routes import wiki_router, init_wiki_routes
 
@@ -61,6 +61,8 @@ jinja_env = Environment(
 )
 
 jinja_env.globals["VERSION"] = __version__
+jinja_env.globals["current_job_info"] = current_job_info
+
 
 def _render(name: str, **kwargs) -> str:
     """渲染模板并返回 HTML 字符串。"""
@@ -189,12 +191,16 @@ async def dashboard(request: Request):
     stats = store.stats()
     recent = store.list_recent(limit=10)
     jobs = list_jobs(limit=10)
+    tags = store.top_tags(limit=12)
+    picks = store.random_old(limit=3, exclude_days=7)
     return HTMLResponse(_render(
         "index.html",
         request=request,
         stats=stats,
         recent=recent,
         jobs=jobs,
+        tags=tags,
+        picks=picks,
     ))
 
 
@@ -358,6 +364,20 @@ async def api_dashboard_recent():
     """返回最近内容 HTML 片段（供 HTMX 轮询）。"""
     recent = store.list_recent(limit=10)
     return HTMLResponse(_render("dashboard_recent.html", recent=recent))
+
+
+@app.get("/api/dashboard/tags")
+async def api_dashboard_tags():
+    """返回热门标签 HTML 片段（供 HTMX 轮询）。"""
+    tags = store.top_tags(limit=12)
+    return HTMLResponse(_render("dashboard_tags.html", tags=tags))
+
+
+@app.get("/api/dashboard/random-picks")
+async def api_dashboard_random_picks():
+    """返回随机旧知识 HTML 片段（每次刷新不同）。"""
+    picks = store.random_old(limit=3, exclude_days=7)
+    return HTMLResponse(_render("dashboard_random.html", picks=picks))
 
 
 @app.get("/api/stats")
@@ -574,6 +594,50 @@ async def api_update_config(
     return {"status": "ok", "webhook_url": webhook_url, "webhook_type": webhook_type}
 
 
+# ═══════════════════════════════════════════
+#  处理控制（停止录入）
+# ═══════════════════════════════════════════
+
+@app.get("/api/worker/status")
+async def api_worker_status():
+    """返回当前录入状态。"""
+    return current_job_info()
+
+
+@app.post("/api/worker/stop-current")
+async def api_worker_stop_current():
+    """停止当前录入。"""
+    stop_current_job()
+    return current_job_info()
+
+
+@app.post("/api/worker/stop-all")
+async def api_worker_stop_all():
+    """停止全部录入（当前+队列）。"""
+    stop_all_jobs()
+    return current_job_info()
+
+
+@app.get("/api/worker/status-bar")
+async def api_worker_status_bar():
+    """返回录入状态 HTML 片段（供 HTMX 轮询）。"""
+    return HTMLResponse(_render("dashboard_worker.html"))
+
+
+@app.post("/api/worker/stop-current-bar")
+async def api_worker_stop_current_bar():
+    """停止当前并返回 HTML 片段。"""
+    stop_current_job()
+    return HTMLResponse(_render("dashboard_worker.html"))
+
+
+@app.post("/api/worker/stop-all-bar")
+async def api_worker_stop_all_bar():
+    """停止全部并返回 HTML 片段。"""
+    stop_all_jobs()
+    return HTMLResponse(_render("dashboard_worker.html"))
+
+
 @app.get("/api/login/status")
 async def api_login_status():
     """检查抖音登录状态。"""
@@ -750,7 +814,10 @@ async def api_agent_search(
             "created_at": entry.get("created_at", ""),
             "top_comments": [
                 {
-                    "user": c.get("user", {}).get("nickname", c.get("user_name", "")),
+                    "user": (
+                        c["user"] if isinstance(c.get("user"), str)
+                        else (c.get("user") or {}).get("nickname", c.get("user_name", ""))
+                    ),
                     "content": c.get("content", c.get("text", ""))[:200],
                     "likes": c.get("likes", c.get("digg_count", 0)),
                 }

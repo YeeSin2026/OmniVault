@@ -183,18 +183,33 @@
             }
         });
 
-        // 时区自适应：将所有时间转为用户本地时间（服务器均为 UTC）
+        // 时区自适应：将所有 <time> 转为用户本地时间 "YYYY-MM-DD HH:MM TZ"
         function localizeTimestamps(scope) {
             scope = scope || document;
             scope.querySelectorAll('time[datetime]').forEach(function(el) {
                 var dt = el.getAttribute('datetime');
+                if (!dt) return;
                 // 无时区后缀的视为 UTC
                 if (!/[Zz]$/.test(dt) && !/[+-]\d{2}:\d{2}$/.test(dt)) {
                     dt += 'Z';
                 }
                 var d = new Date(dt);
-                if (isNaN(d)) return;
-                el.textContent = d.toLocaleString();
+                if (isNaN(d.getTime())) return;
+
+                var pad = function(n) { return String(n).padStart(2, '0'); };
+                var yyyy = d.getFullYear();
+                var mm = pad(d.getMonth() + 1);
+                var dd = pad(d.getDate());
+                var hh = pad(d.getHours());
+                var mi = pad(d.getMinutes());
+
+                // 获取时区缩写
+                var tz = Intl.DateTimeFormat('en', { timeZoneName: 'short' })
+                    .formatToParts(d)
+                    .find(function(p) { return p.type === 'timeZoneName'; });
+                var tzLabel = tz ? tz.value : '';
+
+                el.textContent = yyyy + '-' + mm + '-' + dd + ' ' + hh + ':' + mi + (tzLabel ? ' ' + tzLabel : '');
             });
         }
         document.addEventListener('DOMContentLoaded', function() { localizeTimestamps(); });

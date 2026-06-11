@@ -30,6 +30,7 @@ class KnowledgeEntry:
     author: str = ""
     source_url: str = ""
     summary_markdown: str = ""
+    raw_content: str = ""       # 平台原文/视频转写稿全文
     tags: str = ""
     user_requirement: str = ""
     created_at: str = ""
@@ -64,6 +65,7 @@ class KnowledgeStore:
                     author TEXT NOT NULL DEFAULT '',
                     source_url TEXT NOT NULL DEFAULT '',
                     summary_markdown TEXT NOT NULL DEFAULT '',
+                    raw_content TEXT NOT NULL DEFAULT '',
                     tags TEXT NOT NULL DEFAULT '',
                     user_requirement TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL DEFAULT '',
@@ -109,6 +111,7 @@ class KnowledgeStore:
                 "ALTER TABLE knowledge ADD COLUMN content_id TEXT NOT NULL DEFAULT ''",
                 "ALTER TABLE knowledge ADD COLUMN platform TEXT NOT NULL DEFAULT 'douyin'",
                 "ALTER TABLE knowledge ADD COLUMN content_type TEXT NOT NULL DEFAULT 'video'",
+                "ALTER TABLE knowledge ADD COLUMN raw_content TEXT NOT NULL DEFAULT ''",
             ]:
                 try:
                     conn.execute(col_stmt)
@@ -162,6 +165,7 @@ class KnowledgeStore:
                 entry.content_id, entry.platform, entry.content_type,
                 entry.title, entry.author,
                 entry.source_url, entry.summary_markdown,
+                entry.raw_content,
                 entry.tags, entry.user_requirement,
                 entry.created_at, entry.duration_seconds,
                 entry.video_code, entry.timestamp,
@@ -171,12 +175,13 @@ class KnowledgeStore:
             if entry.video_code:
                 sql = """INSERT INTO knowledge
                    (content_id, platform, content_type, title, author, source_url, summary_markdown,
-                    tags, user_requirement, created_at, duration_seconds, video_code, timestamp, comments_json)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    raw_content, tags, user_requirement, created_at, duration_seconds, video_code, timestamp, comments_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(video_code) DO UPDATE SET
                        title=excluded.title,
                        author=excluded.author,
                        summary_markdown=excluded.summary_markdown,
+                       raw_content=excluded.raw_content,
                        tags=excluded.tags,
                        user_requirement=excluded.user_requirement,
                        created_at=excluded.created_at,
@@ -185,8 +190,8 @@ class KnowledgeStore:
             else:
                 sql = """INSERT INTO knowledge
                    (content_id, platform, content_type, title, author, source_url, summary_markdown,
-                    tags, user_requirement, created_at, duration_seconds, video_code, timestamp, comments_json)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                    raw_content, tags, user_requirement, created_at, duration_seconds, video_code, timestamp, comments_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
             cursor = conn.execute(sql, params)
             conn.commit()
             eid = cursor.lastrowid
@@ -558,10 +563,63 @@ class KnowledgeStore:
             row = conn.execute(
                 "SELECT COUNT(*) as total, MAX(created_at) as latest FROM knowledge"
             ).fetchone()
+            # 本周新增（北京时间周一 00:00 → UTC 换算）
+            from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+            now_utc = _dt.now(_tz.utc)
+            now_bj = now_utc + _td(hours=8)
+            # 本周一 00:00 北京时间
+            monday_bj = now_bj.replace(hour=0, minute=0, second=0, microsecond=0) - _td(days=now_bj.weekday())
+            monday_utc = monday_bj - _td(hours=8)
+            week_row = conn.execute(
+                "SELECT COUNT(*) as cnt FROM knowledge WHERE created_at >= ?",
+                (monday_utc.isoformat(),),
+            ).fetchone()
             return {
                 "total_entries": row["total"],
                 "latest_entry": row["latest"],
+                "week_new": week_row["cnt"],
                 "db_path": self.db_path,
             }
+        finally:
+            conn.close()
+
+    def top_tags(self, limit: int = 15) -> list[dict]:
+        """标签频次排行 — 拆分 tags 字段聚合计数。"""
+        conn = self._get_conn()
+        try:
+            rows = conn.execute("SELECT tags FROM knowledge WHERE tags != ''").fetchall()
+        finally:
+            conn.close()
+
+        # Python 侧拆分 + 计数（SQLite 不擅长字符串拆分）
+        from collections import Counter
+        counter = Counter()
+        for r in rows:
+            for tag in r["tags"].split(","):
+                tag = tag.strip()
+                if tag:
+                    counter[tag] += 1
+
+        return [
+            {"tag": tag, "count": count}
+            for tag, count in counter.most_common(limit)
+        ]
+
+    def random_old(self, limit: int = 3, exclude_days: int = 7) -> list[dict]:
+        """随机抽取 N 天前的旧知识，让沉底内容重新浮现。"""
+        from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+        cutoff = (_dt.now(_tz.utc) - _td(days=exclude_days)).isoformat()
+
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT id, content_id, platform, content_type, title, author, tags,
+                          source_url, created_at, substr(summary_markdown, 1, 200) AS snippet
+                   FROM knowledge
+                   WHERE created_at < ?
+                   ORDER BY RANDOM() LIMIT ?""",
+                (cutoff, limit),
+            ).fetchall()
+            return [dict(r) for r in rows]
         finally:
             conn.close()

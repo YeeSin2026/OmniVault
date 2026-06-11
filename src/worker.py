@@ -14,21 +14,24 @@ import time
 
 from . import config
 from .task_queue import (
+    cancel_all_pending,
     clear_processed_video,
     create_job,
     get_job,
     is_video_processed,
     list_jobs,
+    mark_cancelled,
     mark_done,
     mark_failed,
     mark_video_processed,
+    pending_count,
     update_progress,
     get_config as tq_get_config,
     set_config as tq_set_config,
 )
 from .knowledge_store import KnowledgeStore, KnowledgeEntry
 from .video_processor import download_video, extract_audio, cleanup as vp_cleanup
-from .summarizer import summarize_video, summarize_from_text, generate_tags, filter_valuable_comments
+from .summarizer import summarize_video, summarize_from_text, generate_tags, filter_valuable_comments, transcribe_audio
 from .comment_scraper import scrape_comments
 from .webhooks import send_webhook
 from .writer import write_entry
@@ -52,6 +55,8 @@ except Exception as e:
 _runtime_config = {}
 _config_lock = threading.Lock()
 _running = True
+_cancel_current = False  # 取消当前任务
+_current_job = {}        # 当前正在处理的任务信息 {url, platform, title, step}
 
 
 def reload_config():
@@ -83,7 +88,7 @@ async def _compile_to_wiki(entry_id: int, title: str):
 
 def start_worker():
     """主工作循环 — 在单独线程中运行。"""
-    global _running
+    global _running, _current_job, _cancel_current
     _running = True
     reload_config()
     logger.info("后台工作线程已启动")
@@ -97,17 +102,33 @@ def start_worker():
             pending = [j for j in jobs if j.get("status") == "pending" and j.get("type") == "url"]
 
             if not pending:
+                _current_job.clear()
                 time.sleep(2)
                 continue
 
             job = pending[0]
-            logger.info(f"处理作业: {job['id']} ({job['url'][:60]})")
+            from .platform import detect_platform
+            platform = detect_platform(job.get("url", "")) or "?"
+            _current_job = {"id": job["id"], "url": job["url"], "platform": platform, "title": "", "step": "开始处理"}
+            _cancel_current = False
 
+            logger.info(f"处理作业: {job['id']} ({job['url'][:60]})")
             update_progress(job["id"], {"step": "开始处理", "progress": 0})
 
             result = loop.run_until_complete(
                 _process_content(job["id"], job["url"])
             )
+
+            # 被取消
+            if _cancel_current:
+                mark_cancelled(job["id"])
+                logger.info(f"作业已取消: {job['id']}")
+                _current_job.clear()
+                _cancel_current = False
+                continue
+
+            _current_job["title"] = result.get("title", "")
+            _current_job["step"] = "完成"
 
             if result.get("status") == "done":
                 mark_done(job["id"], result)
@@ -176,6 +197,8 @@ async def _process_douyin(job_id: str, url: str, result: dict) -> dict:
         video_id = video_data["video_id"]
         title = video_data["title"]
         author = video_data["author"]
+        _current_job["title"] = title
+        _current_job["step"] = "下载完成"
         images = video_data.get("images", [])
         content_type = video_data.get("content_type", "video")
 
@@ -222,6 +245,7 @@ async def _process_douyin(job_id: str, url: str, result: dict) -> dict:
         # 视频: 提取音频 → Whisper → 总结
         # 笔记: 图片描述 + 标题 → 文本总结
         final_md = ""
+        raw_text = ""  # 转写稿 / 图片描述全文
         if content_type == "video" and video_data.get("video_path"):
             update_progress(job_id, {"step": "提取音频", "progress": 25})
             try:
@@ -232,24 +256,30 @@ async def _process_douyin(job_id: str, url: str, result: dict) -> dict:
 
             update_progress(job_id, {"step": "AI 总结中", "progress": 40})
             if audio_path:
+                update_progress(job_id, {"step": "语音转写中", "progress": 30})
+                raw_text = await asyncio.get_event_loop().run_in_executor(
+                    None, transcribe_audio, audio_path,
+                )
                 final_md = await summarize_video(
                     audio_path=audio_path, title=title, author=author,
+                    transcript=raw_text,
                 )
             else:
                 from .summarizer import summarize_from_text
+                raw_text = f"作者: {author}\n\n此视频无音频轨道。{images_text}"
                 final_md = await summarize_from_text(
                     title=title,
-                    desc=f"作者: {author}\n\n此视频无音频轨道。{images_text}",
+                    desc=raw_text,
                     author=author,
                 )
         else:
             # 图文笔记：图片描述 + 标题
             update_progress(job_id, {"step": "AI 总结中", "progress": 40})
             from .summarizer import summarize_from_text
-            desc = f"作者: {author}\n\n{images_text}"
+            raw_text = f"作者: {author}\n\n{images_text}"
             final_md = await summarize_from_text(
                 title=title,
-                desc=desc,
+                desc=raw_text,
                 author=author,
             )
 
@@ -282,6 +312,7 @@ async def _process_douyin(job_id: str, url: str, result: dict) -> dict:
             title=title, author=author,
             source_url=url,
             summary_markdown=final_md,
+            raw_content=raw_text,
             tags=tags,
             comments_json=json.dumps(comments, ensure_ascii=False),
         )
@@ -324,6 +355,8 @@ async def _process_with_adapter(job_id: str, url: str, platform: str, result: di
     content_id = content.content_id
     title = content.title
     author = content.author
+    _current_job["title"] = title
+    _current_job["step"] = "内容获取完成"
 
     if is_video_processed(content_id):
         # 检查知识库记录是否还存在（可能已被删除）
@@ -368,23 +401,29 @@ async def _process_with_adapter(job_id: str, url: str, platform: str, result: di
     # 根据内容类型分流
     final_md = ""
 
+    raw_text = ""  # 平台原文/转写稿全文
+
     if content.content_type == "video" and content.audio_path:
         # 视频类: Whisper 转写 + LLM 总结
+        update_progress(job_id, {"step": "语音转写中", "progress": 30})
+        raw_text = await asyncio.get_event_loop().run_in_executor(
+            None, transcribe_audio, content.audio_path,
+        )
         update_progress(job_id, {"step": "AI 总结中", "progress": 40})
         final_md = await summarize_video(
             audio_path=content.audio_path,
             title=title,
             author=author,
+            transcript=raw_text,  # 跳过重复转写
         )
     elif content.text_content:
-        # 图文/纯文本类: 跳过 Whisper，直接 LLM 总结
+        # 图文/纯文本类: 直接 LLM 总结，全文传入不截断
         update_progress(job_id, {"step": "AI 总结中", "progress": 40})
+        raw_text = content.text_content
         desc = content.description or ""
-        # 如果文字内容太长，截取前 10000 字
-        text = content.text_content[:10000]
         final_md = await summarize_from_text(
             title=title,
-            desc=f"{desc}\n\n正文内容：\n{text}",
+            desc=f"{desc}\n\n正文内容：\n{raw_text}",
             author=author,
         )
     elif content.content_type == "video" and content.video_path:
@@ -392,23 +431,30 @@ async def _process_with_adapter(job_id: str, url: str, platform: str, result: di
         update_progress(job_id, {"step": "提取音频", "progress": 25})
         try:
             audio_path = extract_audio(content.video_path)
+            update_progress(job_id, {"step": "语音转写中", "progress": 30})
+            raw_text = await asyncio.get_event_loop().run_in_executor(
+                None, transcribe_audio, audio_path,
+            )
             update_progress(job_id, {"step": "AI 总结中", "progress": 40})
             final_md = await summarize_video(
                 audio_path=audio_path, title=title, author=author,
+                transcript=raw_text,
             )
         except Exception as e:
             logger.warning(f"音频提取失败，使用文本描述: {e}")
+            raw_text = content.description or content.text_content or ""
             final_md = await summarize_from_text(
                 title=title,
-                desc=content.description or content.text_content or "",
+                desc=raw_text,
                 author=author,
             )
     else:
         # 兜底：有描述就用描述总结
         update_progress(job_id, {"step": "AI 总结中", "progress": 40})
+        raw_text = content.description or ""
         final_md = await summarize_from_text(
             title=title,
-            desc=content.description or "",
+            desc=raw_text,
             author=author,
         )
 
@@ -439,6 +485,7 @@ async def _process_with_adapter(job_id: str, url: str, platform: str, result: di
         author=author,
         source_url=url,
         summary_markdown=final_md,
+        raw_content=raw_text,
         tags=tags,
         comments_json=json.dumps(comments, ensure_ascii=False),
     )
@@ -458,6 +505,30 @@ async def _process_with_adapter(job_id: str, url: str, platform: str, result: di
     result["summary_preview"] = final_md[:2000] if final_md else ""
 
     return result
+
+
+def stop_current_job():
+    """停止当前正在处理的任务。"""
+    global _cancel_current
+    _cancel_current = True
+    logger.info("⏹ 停止当前录入")
+
+
+def stop_all_jobs():
+    """停止当前任务 + 清空所有排队任务。"""
+    global _cancel_current
+    _cancel_current = True
+    n = cancel_all_pending()
+    logger.info(f"⏹ 停止全部录入: 当前任务 + {n} 条排队已取消")
+
+
+def current_job_info() -> dict:
+    """返回当前处理状态。"""
+    return {
+        "running": _running,
+        "current": dict(_current_job) if _current_job else None,
+        "queue_count": pending_count(),
+    }
 
 
 def stop_worker():

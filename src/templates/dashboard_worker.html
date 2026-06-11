@@ -1,0 +1,38 @@
+<div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2d p-5 mb-5" id="worker-status-bar" hx-get="/api/worker/status-bar" hx-trigger="every 5s" hx-swap="outerHTML">
+    {% set info = current_job_info() %}
+    {% set cur = info.current %}
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <span class="text-[13px] font-semibold text-zinc-700 dark:text-zinc-200">正在录入</span>
+            {% if cur %}
+            <span class="text-[9px] px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+                {{ cur.platform }}
+            </span>
+            <span class="text-[12px] text-zinc-500 dark:text-zinc-400 truncate max-w-md">
+                {{ cur.title or cur.url[:50] }}
+            </span>
+            {% else %}
+            <span class="text-[12px] text-zinc-400 dark:text-zinc-500">空闲</span>
+            {% endif %}
+            {% if info.queue_count > 0 %}
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                队列中 {{ info.queue_count }} 条
+            </span>
+            {% endif %}
+        </div>
+        {% if cur %}
+        <div class="flex items-center gap-2">
+            <button hx-post="/api/worker/stop-current-bar" hx-target="#worker-status-bar" hx-swap="outerHTML"
+                    class="text-[11px] px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors font-medium cursor-pointer">
+                ⏹ 停止录入
+            </button>
+            {% if info.queue_count > 1 %}
+            <button hx-post="/api/worker/stop-all-bar" hx-target="#worker-status-bar" hx-swap="outerHTML"
+                    class="text-[11px] px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors font-medium cursor-pointer">
+                ⏹ 一键停止全部
+            </button>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
