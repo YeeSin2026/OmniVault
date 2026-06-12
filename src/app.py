@@ -74,7 +74,7 @@ async def activation_middleware(request: Request, call_next):
     """拦截所有请求，未激活时跳转到激活页面。"""
     # 允许静态资源和激活相关请求通过
     path = request.url.path
-    allowed = ["/activate", "/api/activate", "/static", "/favicon.ico"]
+    allowed = ["/activate", "/api/activate", "/setup", "/api/setup", "/static", "/favicon.ico"]
     if any(path.startswith(p) for p in allowed):
         return await call_next(request)
 
@@ -107,6 +107,55 @@ async def activate_api(key: str = Form(...)):
     if do_activate(key):
         return {"ok": True, "message": "激活成功 · Activated"}
     return {"ok": False, "message": "激活码无效 · Invalid key"}
+
+
+# ── 初始化设置向导 ──
+
+@app.get("/setup")
+async def setup_page(request: Request):
+    """设置向导页面 — 首次启动时引导用户配置 API Key 等。"""
+    current_config = {
+        "LLM_API_KEY": config.LLM_API_KEY[:8] + "***" if len(config.LLM_API_KEY) > 8 else config.LLM_API_KEY,
+        "LLM_BASE_URL": config.LLM_BASE_URL,
+        "LLM_MODEL": config.LLM_MODEL,
+        "EMBEDDING_API_URL": config.EMBEDDING_API_URL,
+        "EMBEDDING_API_KEY": (config.EMBEDDING_API_KEY[:8] + "***") if len(config.EMBEDDING_API_KEY) > 8 else "",
+        "EMBEDDING_MODEL": config.EMBEDDING_MODEL,
+        "FEISHU_APP_ID": config.FEISHU_APP_ID,
+        "FEISHU_APP_SECRET": "***" if config.FEISHU_APP_SECRET else "",
+    }
+    return HTMLResponse(_render("setup.html", config=current_config, activated=is_activated()))
+
+
+@app.post("/api/setup/save")
+async def setup_save_api(data: dict):
+    """保存设置到 /data/.env（Docker 持久化卷）。"""
+    try:
+        lines = []
+        for key, value in data.items():
+            if value and isinstance(value, str) and value.strip():
+                lines.append(f"{key}={value.strip()}")
+
+        if not lines:
+            return {"ok": False, "error": "没有需要保存的配置"}
+
+        # 写入 /data/.env
+        env_path = Path("/data/.env")
+        env_path.parent.mkdir(parents=True, exist_ok=True)
+        env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        logger.info(f"设置已保存到 {env_path}: {len(lines)} 项")
+
+        # 处理激活码
+        activation_key = data.get("ACTIVATION_KEY", "")
+        if activation_key:
+            activated = do_activate(activation_key)
+            if not activated:
+                return {"ok": False, "error": "激活码无效 · Invalid activation key"}
+
+        return {"ok": True, "message": f"配置已保存（{len(lines)} 项），请重启容器生效"}
+    except Exception as e:
+        logger.error(f"保存设置失败: {e}")
+        return {"ok": False, "error": str(e)}
 
 
 # ── LLM Wiki 路由注册 ──

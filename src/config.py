@@ -4,7 +4,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 _project_root = Path(__file__).resolve().parent.parent
+# 优先级：环境变量 > /data/.env（Docker 持久化） > 项目 .env
 load_dotenv(_project_root / ".env")
+_data_env = Path("/data/.env")
+if _data_env.exists():
+    load_dotenv(_data_env, override=True)  # /data/.env 覆盖项目默认值
 
 
 def _require(key: str) -> str:
