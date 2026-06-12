@@ -14,17 +14,6 @@ from .schema import WikiSchema
 
 logger = logging.getLogger(__name__)
 
-# ── 索引分类映射 ──
-
-CATEGORY_MAP = {
-    "实体": "实体",
-    "概念": "概念",
-    "来源": "来源",
-    "探索": "探索",
-    "对比": "对比",
-}
-
-
 class WikiIndexer:
     """Wiki 索引维护器。"""
 

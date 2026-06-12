@@ -10,8 +10,6 @@ import logging
 import os
 import re
 
-import httpx
-
 from . import register_adapter
 from .base import BasePlatformAdapter, PlatformContent
 

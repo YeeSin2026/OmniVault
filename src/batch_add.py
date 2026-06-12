@@ -18,7 +18,6 @@ from .task_queue import (
     create_job,
     is_video_processed,
     mark_done,
-    mark_failed,
     mark_video_processed,
     update_progress,
 )

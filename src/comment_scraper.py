@@ -15,7 +15,6 @@ cookies 说明：
 import logging
 import random
 import time
-from typing import Optional
 
 import httpx
 
@@ -130,7 +129,7 @@ def _scrape_signed_api(
 
     需要已登录 cookies（否则返回空）。支持游标分页获取全部评论。
     """
-    from .signer import generate_a_bogus, build_comment_params, generate_ms_token
+    from .signer import generate_a_bogus, build_comment_params
 
     result = []
     seen = set()
@@ -227,8 +226,11 @@ def _scrape_ies_api(video_id: str, max_count: int) -> list[dict]:
             resp.raise_for_status()
             data = resp.json()
 
-            status = data.get("status_code", {})
-            if isinstance(status, dict) and status.get("StatusCode", 0) != 0:
+            # API 返回整数 status_code: 0=成功, 非0=错误
+            status_code = data.get("status_code", 0)
+            if isinstance(status_code, int) and status_code != 0:
+                break
+            if isinstance(status_code, dict) and status_code.get("StatusCode", 0) != 0:
                 break
 
             has_more = bool(data.get("has_more", False))

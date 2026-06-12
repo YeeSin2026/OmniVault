@@ -7,7 +7,6 @@ Facebook 限制极为严格（需登录、反爬强），仅支持：
 
 import logging
 import os
-import re
 
 from . import register_adapter
 from .base import BasePlatformAdapter, PlatformContent

@@ -6,7 +6,6 @@
 import json
 import logging
 import os
-import re
 import threading
 import time as _time
 from datetime import datetime

@@ -33,7 +33,8 @@
             {% for m in [('hybrid', '混合'), ('semantic', '语义'), ('keyword', '关键词')] %}
             <label class="flex items-center gap-1 text-[12px] text-zinc-600 dark:text-zinc-400 cursor-pointer">
                 <input type="radio" name="mode" value="{{ m[0] }}" {% if mode == m[0] %}checked{% endif %}
-                       class="text-zinc-800 dark:text-zinc-300 focus:ring-zinc-400">
+                       class="text-zinc-800 dark:text-zinc-300 focus:ring-zinc-400"
+                       onchange="this.form.requestSubmit()">
                 {{ m[1] }}
             </label>
             {% endfor %}

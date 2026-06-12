@@ -5,7 +5,6 @@ API 返回空响应，仅能通过 iesdouyin 游客 API 获取少量评论。
 """
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Optional
 

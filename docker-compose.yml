@@ -32,6 +32,15 @@ services:
       - WEBHOOK_TYPE=${WEBHOOK_TYPE:-}
       - DOUYIN_LOGIN_ENABLED=${DOUYIN_LOGIN_ENABLED:-false}
       - MAX_COMMENTS_PER_VIDEO=${MAX_COMMENTS_PER_VIDEO:-50}
+      - MAX_CREATOR_VIDEOS=${MAX_CREATOR_VIDEOS:-50}
+      - MIN_SEMANTIC_SCORE=${MIN_SEMANTIC_SCORE:-0.38}
+      # 远程 Embedding API（推荐，不设置则用本地 BGE-small-zh 24MB 模型）
+      # Jina AI 免费额度: https://api.jina.ai/v1/embeddings, model=jina-embeddings-v3
+      # SiliconFlow: https://api.siliconflow.cn/v1/embeddings, model=BAAI/bge-m3
+      - EMBEDDING_API_URL=${EMBEDDING_API_URL:-}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-bge-m3}
+      - EMBEDDING_DIM=${EMBEDDING_DIM:-1024}
       - KNOWLEDGE_DB_PATH=/data/knowledge.db
       - JOBS_DB_PATH=/data/jobs.db
       - COOKIES_FILE_PATH=/data/.douyin_cookies.json

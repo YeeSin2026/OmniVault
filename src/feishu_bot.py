@@ -3,10 +3,11 @@
 接收任意平台链接 → 提交任务队列 → 轮询结果 → 回复飞书消息。
 """
 
-import asyncio
 import json
 import logging
 import re
+import sqlite3
+import os as _os
 import time
 import threading
 
@@ -30,9 +31,6 @@ _URL_RE = re.compile(r"https?://[^\s]+")
 
 
 # ── Bot 任务持久化（防止重启丢失跟踪）──
-
-import sqlite3
-import os as _os
 
 _BOT_DB = _os.environ.get("JOBS_DB_PATH", "/data/jobs.db")
 
@@ -84,45 +82,8 @@ def _bot_load_pending() -> dict[str, dict]:
                 # 仍在处理中，加入轮询
                 pending[job_id] = {"message_id": message_id, "url": url, "_last_update": time.time()}
             elif status in ("done", "failed"):
-                # 已完成但可能未回复，立即回复
-                try:
-                    # get_job 已解析 result 为 dict，直接使用
-                    result_data = job.get("result") or {}
-
-                    if status == "done":
-                        title = result_data.get("title", "未知")
-                        author = result_data.get("author", "")
-                        tags = result_data.get("tags", "")
-                        platform = result_data.get("platform", "")
-                        entry_id = result_data.get("entry_id")
-                        summary = result_data.get("summary_preview", "") or ""
-
-                        logger.info(f"补发完成: {job_id[:8]} title={title[:30]} summary_len={len(summary)}")
-
-                        tag_str = " ".join(f"#{t.strip()}" for t in tags.split(",") if t.strip())
-                        # 知识优先：先展示 AI 总结，元数据放后面
-                        if summary:
-                            reply = f"📝 {_clean_markdown(summary)[:2000]}"
-                        else:
-                            reply = f"📝 已完成总结，但摘要内容为空。"
-                        reply += f"\n\n📹 {title}"
-                        if author:
-                            reply += f"  |  👤 {author}"
-                        if platform:
-                            reply += f"\n📌 平台: {platform}"
-                        if tag_str:
-                            reply += f"\n🏷️ {tag_str}"
-                        if entry_id:
-                            reply += f"\n\n🔗 查看详情: http://localhost:8080/videos/{entry_id}"
-                            reply += f"\n💡 回复「删除 {entry_id}」可删除此条"
-                    else:
-                        error = result_data.get("error", "未知错误")
-                        reply = f"❌ 处理失败: {error[:500]}"
-
-                    reply_message(message_id, reply)
-                    logger.info(f"补发飞书回复: {job_id[:8]} → {title[:30] if status == 'done' else error[:30]}")
-                except Exception as e:
-                    logger.warning(f"补发回复失败: {e}")
+                # 已完成的任务，只清理跟踪记录，不重复发送回复
+                logger.info(f"清理已完成 bot 任务: {job_id[:8]} ({status})")
 
         # 清理已完成的 bot 跟踪记录
         conn.execute("DELETE FROM bot_tasks WHERE job_id IN (SELECT id FROM jobs WHERE status IN ('done', 'failed'))")
@@ -355,7 +316,6 @@ def on_message_receive(event) -> None:
     if del_match:
         entry_id = int(del_match.group(1))
         try:
-            from .knowledge_store import KnowledgeStore
             ks = KnowledgeStore()
             deleted = ks.delete_by_id(entry_id)
             if deleted:

@@ -7,9 +7,7 @@
 """
 import logging
 import sys
-from pathlib import Path
 
-from . import config
 from .cookie_manager import save_cookies
 
 logger = logging.getLogger(__name__)

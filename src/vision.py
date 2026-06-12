@@ -5,10 +5,7 @@
 
 import asyncio
 import base64
-import json
 import logging
-import subprocess
-import tempfile
 import os
 
 import httpx
@@ -41,7 +38,8 @@ def _detect_mime(data: bytes) -> str:
         return "image/jpeg"
     if data[:6] in (b"GIF87a", b"GIF89a"):
         return "image/gif"
-    if data[:4] in (b"RIFF", b"WEBP"):
+    # WEBP 文件是 RIFF 容器，magic bytes 为 RIFF + 偏移 8 处的 WEBP
+    if data[:4] == b"RIFF" and len(data) >= 12 and data[8:12] == b"WEBP":
         return "image/webp"
     return "image/jpeg"
 

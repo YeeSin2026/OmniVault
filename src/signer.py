@@ -6,10 +6,9 @@
 参考: NanmiCoder/MediaCrawler libs/douyin.js
 """
 import logging
-import os
 import random
 from pathlib import Path
-from urllib.parse import urlencode, quote
+from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 

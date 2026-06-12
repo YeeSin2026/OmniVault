@@ -137,10 +137,10 @@ class ABogus:
         return self.reg_to_array(self.reg)
 
     def write(self, e):
-        self.size = len(e)
         if isinstance(e, str):
             e = self.decode_string(e)
             e = self.char_code_at(e)
+        self.size = len(e)  # 在 decode/convert 之后计算，确保 fill() 中的位计数正确
         if len(e) <= 64:
             self.chunk = e
         else:

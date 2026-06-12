@@ -48,6 +48,16 @@ JOBS_DB_PATH = _optional("JOBS_DB_PATH", "")
 # ── 限制 ──
 MAX_VIDEOS_PER_DAY = int(_optional("MAX_VIDEOS_PER_DAY", "200"))
 MAX_COMMENTS_PER_VIDEO = int(_optional("MAX_COMMENTS_PER_VIDEO", "50"))
+MAX_CREATOR_VIDEOS = int(_optional("MAX_CREATOR_VIDEOS", "50"))  # 博主全量采集上限
 
 # ── Obsidian / Markdown 导出 ──
 OBSIDIAN_VAULT_PATH = _optional("OBSIDIAN_VAULT_PATH", "")
+
+# ── Embedding 服务 ──
+# 默认使用本地 BGE-small-zh 模型。设置 EMBEDDING_API_URL 则使用远程 API。
+# 示例（Jina AI 免费额度）: EMBEDDING_API_URL=https://api.jina.ai/v1/embeddings
+# 示例（SiliconFlow BGE-M3）: EMBEDDING_API_URL=https://api.siliconflow.cn/v1/embeddings
+EMBEDDING_API_URL = _optional("EMBEDDING_API_URL", "")
+EMBEDDING_API_KEY = _optional("EMBEDDING_API_KEY", "") or LLM_API_KEY  # 默认复用 LLM key
+EMBEDDING_MODEL = _optional("EMBEDDING_MODEL", "bge-m3")  # 远程 API 用的模型名
+EMBEDDING_DIM = int(_optional("EMBEDDING_DIM", "1024"))  # bge-m3 默认 1024 维

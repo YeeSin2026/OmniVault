@@ -36,13 +36,13 @@ from .comment_scraper import scrape_comments
 from .webhooks import send_webhook
 from .writer import write_entry
 from .platform import detect_platform, get_adapter
+from .creator_scraper import is_creator_url, list_creator_content
 
 logger = logging.getLogger(__name__)
 
 # LLM Wiki 集成（可选，失败不影响主流程）
 try:
     from .llm_wiki.compiler import WikiCompiler
-    from .llm_wiki.schema import WikiSchema
     _wiki_compiler = WikiCompiler()
     _wiki_enabled = True
     logger.info("LLM Wiki 编译引擎已就绪")
@@ -107,16 +107,81 @@ def start_worker():
                 continue
 
             job = pending[0]
-            from .platform import detect_platform
-            platform = detect_platform(job.get("url", "")) or "?"
-            _current_job = {"id": job["id"], "url": job["url"], "platform": platform, "title": "", "step": "开始处理"}
+            job_url = job.get("url", "")
+            platform = detect_platform(job_url) or "?"
+            _current_job = {"id": job["id"], "url": job_url, "platform": platform, "title": "", "step": "开始处理"}
             _cancel_current = False
 
-            logger.info(f"处理作业: {job['id']} ({job['url'][:60]})")
-            update_progress(job["id"], {"step": "开始处理", "progress": 0})
+            logger.info(f"处理作业: {job['id']} ({job_url[:60]})")
 
+            # 检测是否为博主主页 → 展开为全量内容链接
+            creator_platform = is_creator_url(job_url)
+            if creator_platform:
+                update_progress(job["id"], {"step": f"发现 {creator_platform} 博主主页，正在获取内容列表...", "progress": 5})
+                content_urls = loop.run_until_complete(
+                    list_creator_content(job_url, creator_platform)
+                )
+                if not content_urls:
+                    update_progress(job["id"], {"step": "未发现任何内容", "progress": 100})
+                    mark_failed(job["id"], {"error": "未发现任何内容", "platform": creator_platform})
+                    _current_job.clear()
+                    continue
+
+                # 批量处理：每个内容创建独立 job，走完整流水线
+                total = len(content_urls)
+                done = skipped = failed = 0
+                update_progress(job["id"], {"step": f"开始批量处理 {total} 个内容...", "total": total, "done": 0, "failed": 0})
+
+                for i, content_url in enumerate(content_urls):
+                    if _cancel_current or not _running:
+                        break
+                    _current_job["step"] = f"批量 [{i+1}/{total}]"
+                    try:
+                        # 创建子任务（type=batch_item，避免与普通 url 任务混淆）
+                        sub_job_id = create_job("batch_item", content_url, parent_job_id=job["id"])
+                        res = loop.run_until_complete(
+                            _process_content(sub_job_id, content_url)
+                        )
+                        # 子任务结果写入自己的 job
+                        if res.get("status") == "done":
+                            mark_done(sub_job_id, res)
+                            done += 1
+                        elif res.get("status") == "skipped":
+                            mark_done(sub_job_id, res)
+                            skipped += 1
+                        elif res.get("status") == "failed":
+                            mark_failed(sub_job_id, res.get("error", "未知错误"))
+                            failed += 1
+                    except Exception as e:
+                        logger.warning(f"  内容处理失败 [{i+1}/{total}]: {e}")
+                        failed += 1
+
+                    update_progress(job["id"], {"total": total, "done": done, "skipped": skipped, "failed": failed})
+
+                    if i < total - 1:
+                        delay = random.uniform(5, 15)
+                        logger.info(f"  等待 {delay:.0f}s... ({i+1}/{total})")
+                        time.sleep(delay)
+
+                result = {
+                    "status": "done",
+                    "type": "creator_batch",
+                    "platform": creator_platform,
+                    "title": f"博主批量采集: {job_url[:50]}",
+                    "total": total,
+                    "done": done,
+                    "failed": failed,
+                }
+                _current_job["step"] = f"批量完成 ({done}/{total})"
+                mark_done(job["id"], result)
+                logger.info(f"博主批量采集完成: {done} 成功, {failed} 失败 (共 {total})")
+                _current_job.clear()
+                continue
+
+            # 普通单条内容 → 直接处理
+            update_progress(job["id"], {"step": "开始处理", "progress": 0})
             result = loop.run_until_complete(
-                _process_content(job["id"], job["url"])
+                _process_content(job["id"], job_url)
             )
 
             # 被取消
@@ -169,15 +234,12 @@ async def _process_content(job_id: str, url: str) -> dict:
 
     try:
         # 1. 平台识别
-        from .video_processor import extract_url as douyin_extract_url
         platform = detect_platform(url)
         update_progress(job_id, {"step": f"识别为 {platform or 'unknown'} 平台", "progress": 5})
 
         if platform == "douyin" or platform is None:
-            # 抖音走原有流程（兼容已有实现）
             return await _process_douyin(job_id, url, result)
         else:
-            # 使用平台适配器
             return await _process_with_adapter(job_id, url, platform, result)
 
     except Exception as e:
@@ -216,7 +278,6 @@ async def _process_douyin(job_id: str, url: str, result: dict) -> dict:
                     result["platform"] = existing.get("platform", "") or "douyin"
                     result["summary_preview"] = (existing.get("summary_markdown", "") or "")[:2000]
                     result["status"] = "skipped"
-                    result["title"] = result.get("title", title)
                     return result
                 else:
                     # 知识库记录已被删除，清除处理标记，重新处理
@@ -372,7 +433,6 @@ async def _process_with_adapter(job_id: str, url: str, platform: str, result: di
                 result["platform"] = existing.get("platform", "") or platform
                 result["summary_preview"] = (existing.get("summary_markdown", "") or "")[:2000]
                 result["status"] = "skipped"
-                result["title"] = result.get("title", title)
                 return result
             else:
                 # 知识库记录已被删除，清除处理标记，重新处理

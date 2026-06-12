@@ -10,7 +10,6 @@ import logging
 import os
 import re
 import subprocess
-from pathlib import Path
 from typing import Optional
 
 import httpx
@@ -167,7 +166,12 @@ async def _download_file(url: str, dest: str, max_retries: int = 3):
 
 
 def extract_audio(video_path: str) -> str:
-    """从视频提取音频 (mp3, 16kHz, mono)。"""
+    """从视频提取音频 (mp3, 16kHz, mono)。
+
+    图文笔记（无视频文件）直接返回空字符串，由调用方跳过语音转写。
+    """
+    if not video_path:
+        return ""
     audio_path = video_path.rsplit(".", 1)[0] + ".mp3"
     if os.path.exists(audio_path):
         return audio_path

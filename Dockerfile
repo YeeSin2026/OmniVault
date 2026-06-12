@@ -8,6 +8,9 @@ RUN apt-get update -o Acquire::Retries=5 && apt-get install -y --fix-missing -o 
     && rm -rf /var/lib/apt/lists/*
 
 # Python 依赖（超时+重试应对弱网络）
+# 先装 CPU 版 torch，防止 sentence-transformers 拉 CUDA 全家桶（nvidia-cublas 等 500MB+）
+RUN pip install --no-cache-dir --default-timeout=300 --retries=5 \
+    torch --index-url https://download.pytorch.org/whl/cpu
 COPY requirements.txt .
 RUN pip install --no-cache-dir --default-timeout=300 --retries=5 \
     -r requirements.txt

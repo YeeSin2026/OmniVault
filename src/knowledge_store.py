@@ -9,7 +9,7 @@ import logging
 import os
 import re
 import sqlite3
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
@@ -106,24 +106,6 @@ class KnowledgeStore:
                 END;
             """)
 
-            # 旧数据库迁移：添加缺失的列
-            for col_stmt in [
-                "ALTER TABLE knowledge ADD COLUMN content_id TEXT NOT NULL DEFAULT ''",
-                "ALTER TABLE knowledge ADD COLUMN platform TEXT NOT NULL DEFAULT 'douyin'",
-                "ALTER TABLE knowledge ADD COLUMN content_type TEXT NOT NULL DEFAULT 'video'",
-                "ALTER TABLE knowledge ADD COLUMN raw_content TEXT NOT NULL DEFAULT ''",
-            ]:
-                try:
-                    conn.execute(col_stmt)
-                except sqlite3.OperationalError:
-                    pass  # 列已存在
-
-            # 将旧的 video_id 数据同步到 content_id（兼容旧数据库）
-            try:
-                conn.execute("UPDATE knowledge SET content_id=video_id WHERE content_id='' AND video_id!=''")
-            except sqlite3.OperationalError:
-                pass  # 旧数据库可能没有 video_id 列
-
             # 向量嵌入表（语义搜索）
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS embeddings (
@@ -134,10 +116,6 @@ class KnowledgeStore:
                     created_at TEXT NOT NULL DEFAULT '',
                     FOREIGN KEY (entry_id) REFERENCES knowledge(id) ON DELETE CASCADE
                 )
-            """)
-            # 创建索引加速关联查询
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_embeddings_entry_id ON embeddings(entry_id)
             """)
 
             conn.commit()
@@ -280,17 +258,31 @@ class KnowledgeStore:
 
     # ── 语义搜索 ──
 
+    def _get_entries_for_search(self) -> list[dict]:
+        """获取所有可直接用于语义搜索的条目（含 title/tags/summary 文本）。"""
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT id, title, author, tags, platform, content_type,
+                          source_url, created_at, summary_markdown
+                   FROM knowledge
+                   WHERE summary_markdown IS NOT NULL AND summary_markdown != ''
+                   ORDER BY created_at DESC"""
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
     def search_semantic(self, query: str, limit: int = 10) -> list[dict]:
-        """纯语义搜索：对存量 embedding 做余弦相似度匹配。"""
-        all_entries = self.get_all_embeddings()
-        if not all_entries:
-            logger.info("语义搜索: 无 embedding 数据，回退到关键词搜索")
+        """纯语义搜索：对知识库所有条目做语义相似度匹配（支持远程 API）。"""
+        entries = self._get_entries_for_search()
+        if not entries:
+            logger.info("语义搜索: 无有效条目，回退到关键词搜索")
             return self.search(query, limit=limit)
 
         from .embedding import semantic_search as _semantic_search
-        ranked = _semantic_search(query, all_entries, top_k=limit)
+        ranked = _semantic_search(query, entries, top_k=limit)
 
-        # 按排名顺序取回完整条目
         results = []
         seen = set()
         for entry_id, score in ranked:
@@ -304,28 +296,37 @@ class KnowledgeStore:
         return results
 
     def search_hybrid(self, query: str, limit: int = 10) -> list[dict]:
-        """混合搜索：RRF 融合 FTS5 关键词 + 语义向量两路结果。"""
-        from .embedding import reciprocal_rank_fusion
+        """混合搜索：关键词锚定 + 语义向量，RRF 融合。"""
+        from .embedding import reciprocal_rank_fusion, _MIN_SEMANTIC_SCORE
 
-        # 路1: FTS5 关键词搜索
         keyword_results = self.search(query, limit=limit * 2)
-        keyword_ranked = [(r["id"], 1.0) for r in keyword_results if r.get("id")]
+        keyword_ids = {r["id"] for r in keyword_results if r.get("id")}
+        keyword_ranked = [
+            (r["id"], (len(keyword_results) - i) / len(keyword_results))
+            for i, r in enumerate(keyword_results) if r.get("id")
+        ]
 
-        # 路2: 语义搜索
-        all_entries = self.get_all_embeddings()
-        if all_entries:
+        entries = self._get_entries_for_search()
+        if entries:
             from .embedding import semantic_search as _semantic_search
-            semantic_ranked = _semantic_search(query, all_entries, top_k=limit * 2)
+            semantic_ranked = _semantic_search(query, entries, top_k=limit * 3)
         else:
             semantic_ranked = []
 
-        # RRF 融合
-        fused = reciprocal_rank_fusion(keyword_ranked, semantic_ranked, k=60, top_k=limit)
+        semantic_ids = {eid for eid, _ in semantic_ranked}
+        anchor_ids = keyword_ids & semantic_ids
 
-        # 按融合排名取回完整条目
+        anchored = [(eid, score) for eid, score in semantic_ranked if eid in anchor_ids]
+        semantic_only = [
+            (eid, score) for eid, score in semantic_ranked
+            if eid not in anchor_ids and score >= _MIN_SEMANTIC_SCORE + 0.05
+        ]
+
+        merged = reciprocal_rank_fusion(keyword_ranked, anchored + semantic_only, k=60, top_k=limit)
+
         results = []
         seen = set()
-        for entry_id, rrf_score in fused:
+        for entry_id, rrf_score in merged:
             if entry_id in seen:
                 continue
             seen.add(entry_id)
@@ -335,7 +336,7 @@ class KnowledgeStore:
                 results.append(entry)
         return results
 
-    # ── 知识关联（相关推荐）──
+    # ── 知识关联    # ── 知识关联（相关推荐）──
 
     def get_related(self, entry_id: int, limit: int = 5) -> list[dict]:
         """找到与指定条目最相关的其他条目（基于语义相似度）。"""
@@ -413,17 +414,6 @@ class KnowledgeStore:
         finally:
             conn.close()
         return processed
-
-    def get_by_title_and_author(self, title: str, author: str) -> List[dict]:
-        conn = self._get_conn()
-        try:
-            rows = conn.execute(
-                "SELECT * FROM knowledge WHERE title = ? AND author = ? ORDER BY created_at DESC",
-                (title, author),
-            ).fetchall()
-            return [dict(r) for r in rows]
-        finally:
-            conn.close()
 
     def search(self, query: str, limit: int = 10) -> List[dict]:
         conn = self._get_conn()
@@ -503,16 +493,6 @@ class KnowledgeStore:
         finally:
             conn.close()
 
-    def get_by_video_code(self, video_code: str) -> Optional[dict]:
-        conn = self._get_conn()
-        try:
-            row = conn.execute(
-                "SELECT * FROM knowledge WHERE video_code = ?", (video_code,)
-            ).fetchone()
-            return dict(row) if row else None
-        finally:
-            conn.close()
-
     def get_by_content_id(self, content_id: str) -> Optional[dict]:
         """按平台内容 ID 查找已入库条目（用于去重后补全信息）。"""
         conn = self._get_conn()
@@ -530,15 +510,6 @@ class KnowledgeStore:
         try:
             conn.execute("DELETE FROM embeddings WHERE entry_id = ?", (entry_id,))
             cur = conn.execute("DELETE FROM knowledge WHERE id = ?", (entry_id,))
-            conn.commit()
-            return cur.rowcount > 0
-        finally:
-            conn.close()
-
-    def delete_by_video_code(self, video_code: str) -> bool:
-        conn = self._get_conn()
-        try:
-            cur = conn.execute("DELETE FROM knowledge WHERE video_code = ?", (video_code,))
             conn.commit()
             return cur.rowcount > 0
         finally:

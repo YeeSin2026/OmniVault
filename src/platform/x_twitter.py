@@ -143,7 +143,8 @@ class XTwitterAdapter(BasePlatformAdapter):
 
         for instance in nitter_instances:
             try:
-                tweet_url = f"{instance}/{url.split('/')[2]}/status/{tweet_id}"
+                # URL 格式: https://x.com/{username}/status/{tweet_id}
+                tweet_url = f"{instance}/{url.split('/')[3]}/status/{tweet_id}"
                 resp = httpx.get(tweet_url, headers=headers, follow_redirects=True, timeout=15)
                 resp.raise_for_status()
                 soup = BeautifulSoup(resp.text, "lxml")

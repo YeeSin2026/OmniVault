@@ -1,6 +1,5 @@
 """Webhook 通知 — 处理完成时向飞书/企业微信发送消息。"""
 
-import json
 import logging
 
 import httpx

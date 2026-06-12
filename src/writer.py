@@ -8,9 +8,8 @@
 
 import json
 import logging
-import shutil
 import tempfile
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from zipfile import ZipFile
@@ -78,52 +77,41 @@ def export_all_to_zip(temp_dir: Optional[str] = None) -> Path:
     target = Path(temp_dir) if temp_dir else Path(tempfile.mkdtemp(prefix="omnivault_export_"))
     target.mkdir(parents=True, exist_ok=True)
 
-    # 查询所有条目（分批以防数据量过大）
-    page = 0
-    page_size = 100
+    # 查询所有条目（一次性加载，list_recent 按时间倒序）
     total = 0
+    items = store.list_recent(limit=5000)
+    for item in (items or []):
+        entry_data = store.get_by_id(item["id"])
+        if not entry_data or not entry_data.get("title"):
+            continue
 
-    while True:
-        items = store.list_recent(limit=page_size) if page == 0 else store.search("", limit=page_size)
-        if not items:
-            break
+        platform = entry_data.get("platform", "unknown")
+        month_str = datetime.now().strftime("%Y-%m")
+        file_id = entry_data.get("content_id") or entry_data.get("video_code") or str(entry_data["id"])
+        filename = f"{file_id}.md"
 
-        for item in items:
-            entry_data = store.get_by_id(item["id"])
-            if not entry_data or not entry_data.get("title"):
-                continue
+        note_dir = target / platform / month_str
+        note_dir.mkdir(parents=True, exist_ok=True)
 
-            platform = entry_data.get("platform", "unknown")
-            month_str = datetime.now().strftime("%Y-%m")
-            file_id = entry_data.get("content_id") or entry_data.get("video_code") or str(entry_data["id"])
-            filename = f"{file_id}.md"
+        entry_kwargs = {
+            k: entry_data.get(k, "")
+            for k in [
+                "content_id", "platform", "content_type", "title", "author",
+                "source_url", "summary_markdown", "tags", "created_at",
+                "duration_seconds", "video_code", "comments_json",
+            ]
+        }
 
-            note_dir = target / platform / month_str
-            note_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            entry = KnowledgeEntry(id=entry_data["id"], **entry_kwargs)
+        except Exception as e:
+            logger.warning(f"跳过条目 {entry_data['id']}: {e}")
+            continue
 
-            entry_kwargs = {
-                k: entry_data.get(k, "")
-                for k in [
-                    "content_id", "platform", "content_type", "title", "author",
-                    "source_url", "summary_markdown", "tags", "created_at",
-                    "duration_seconds", "video_code", "comments_json",
-                ]
-            }
-
-            try:
-                entry = KnowledgeEntry(id=entry_data["id"], **entry_kwargs)
-            except Exception as e:
-                logger.warning(f"跳过条目 {entry_data['id']}: {e}")
-                continue
-
-            comments = _parse_comments_json(entry.comments_json)
-            content = _build_markdown(entry, comments)
-            note_dir.joinpath(filename).write_text(content, encoding="utf-8")
-            total += 1
-
-        page += 1
-        if page > 100:  # 安全上限
-            break
+        comments = _parse_comments_json(entry.comments_json)
+        content = _build_markdown(entry, comments)
+        note_dir.joinpath(filename).write_text(content, encoding="utf-8")
+        total += 1
 
     zip_path = target / "omnivault_export.zip"
     with ZipFile(zip_path, "w") as zf:

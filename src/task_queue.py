@@ -74,14 +74,21 @@ def _init_tables(conn: sqlite3.Connection):
     conn.commit()
 
 
-def create_job(job_type: str, url: str) -> str:
-    """创建任务，返回 job_id。"""
+def create_job(job_type: str, url: str, parent_job_id: str = "") -> str:
+    """创建任务，返回 job_id。
+
+    Args:
+        job_type: 任务类型 (url/batch/batch_item/...)
+        url: 链接
+        parent_job_id: 父任务 ID（批量采集时子任务关联父任务）
+    """
     job_id = uuid.uuid4().hex[:12]
     now = datetime.now(timezone.utc).isoformat()
+    result_init = json.dumps({"parent_job_id": parent_job_id}) if parent_job_id else "{}"
     with _get_db() as conn:
         conn.execute(
-            "INSERT INTO jobs (id, type, url, status, progress, result, created_at, updated_at) VALUES (?, ?, ?, 'pending', '{}', '{}', ?, ?)",
-            (job_id, job_type, url, now, now),
+            "INSERT INTO jobs (id, type, url, status, progress, result, created_at, updated_at) VALUES (?, ?, ?, 'pending', '{}', ?, ?, ?)",
+            (job_id, job_type, url, result_init, now, now),
         )
     logger.info(f"创建任务: {job_id} type={job_type}")
     return job_id
